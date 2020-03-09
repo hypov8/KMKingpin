@@ -132,10 +132,10 @@ void V_AddEntity (entity_t *ent)
 		// what was i thinking before!?
 		for (i=0;i<3;i++)
 			clientOrg[i] = ent->oldorigin[i] = ent->origin[i] = cl.predicted_origin[i];
-
+#if KINGPIN
 		if (hand->value == 1) //lefthanded
 			ent->flags |= RF_MIRRORMODEL;
-
+#endif
 		if (cg_thirdperson->value
 			&& !(cl.attractloop && !(cl.cinematictime > 0 && cls.realtime - cl.cinematictime > 1000)))
 		{
@@ -339,9 +339,13 @@ void V_TestEntities (void)
 		for (j=0; j<3; j++)
 			ent->origin[j] = cl.refdef.vieworg[j] + cl.v_forward[j]*f +
 			cl.v_right[j]*r;
-
+#if KINGPIN
+		ent->model = cl.baseclientinfo.model[0]; //hypov8 add: [0]
+		ent->skin = cl.baseclientinfo.skin[0]; //hypov8 add: [0]
+#else
 		ent->model = cl.baseclientinfo.model;
 		ent->skin = cl.baseclientinfo.skin;
+#endif
 	}
 }
 
@@ -434,10 +438,12 @@ void CL_PrepRefresh (void)
 
 	CL_RegisterTEntModels ();
 
+#if !KINGPIN
 	num_cl_weaponmodels = 1;
-//	strncpy(cl_weaponmodels[0], "weapon.md2");
 	Q_strncpyz(cl_weaponmodels[0], "weapon.md2", sizeof(cl_weaponmodels[0]));
-
+#else
+	num_cl_weaponmodels = 0; //hypov8 add: no default model in kp. everything is in configstrings
+#endif
 	// Knightmare- for Psychospaz's map loading screen
 	for (i=1, max=0 ; i<MAX_MODELS && cl.configstrings[CS_MODELS+i][0] ; i++)
 		max++;
@@ -564,9 +570,14 @@ void CL_PrepRefresh (void)
 	// set sky textures and speed
 	Com_Printf ("sky\r", i); 
 	SCR_UpdateScreen ();
+#if KINGPIN //hypov8 add:
+	rotate = 0.0f;
+	axis[0] = axis[1] = axis[2] = 0.0f;
+#else
 	rotate = atof (cl.configstrings[CS_SKYROTATE]);
 	sscanf (cl.configstrings[CS_SKYAXIS], "%f %f %f", 
 		&axis[0], &axis[1], &axis[2]);
+#endif
 	R_SetSky (cl.configstrings[CS_SKY], rotate, axis);
 	Com_Printf ("                                     \r");
 
@@ -891,7 +902,7 @@ void V_Init (void)
 	cl_testblend = Cvar_Get ("cl_testblend", "0", 0);
 	cl_testparticles = Cvar_Get ("cl_testparticles", "0", 0);
 	cl_testentities = Cvar_Get ("cl_testentities", "0", 0);
-	cl_testlights = Cvar_Get ("cl_testlights", "0", CVAR_CHEAT);
+	cl_testlights = Cvar_Get ("cl_testlights", "0", /*CVAR_CHEAT*/0);
 
 	cl_stats = Cvar_Get ("cl_stats", "0", 0);
 }

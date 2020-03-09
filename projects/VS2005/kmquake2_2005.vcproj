@@ -72,7 +72,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="wsock32.lib winmm.lib zlib_d.lib libjpeg_d.lib libogg_d.lib libvorbisfile_d.lib libpng_d.lib libcurl_r.lib glu32.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib zlib_d.lib libjpeg_d.lib libogg_d.lib libvorbisfile_d.lib libpng_d.lib libcurl_r.lib glu32.lib glu32.lib"
 				OutputFile="./kmquake2.exe"
 				LinkIncremental="1"
 				SuppressStartupBanner="true"
@@ -174,7 +174,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib winmm.lib wsock32.lib zlib_r.lib libjpeg_r.lib libogg_r.lib libvorbisfile_r.lib libpng_r.lib libcurl_r.lib"
+				AdditionalDependencies="kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib winmm.lib wsock32.lib zlib_r.lib libjpeg_r.lib libogg_r.lib libvorbisfile_r.lib libpng_r.lib libcurl_r.lib glu32.lib"
 				OutputFile="./kmquake2.exe"
 				LinkIncremental="1"
 				SuppressStartupBanner="true"
@@ -670,11 +670,11 @@
 			Filter="h;hpp;hxx;hm;inl;fi;fd"
 			>
 			<File
-				RelativePath="..\..\renderer\anorms.h"
+				RelativePath="..\..\client\anorms.h"
 				>
 			</File>
 			<File
-				RelativePath="..\..\client\anorms.h"
+				RelativePath="..\..\renderer\anorms.h"
 				>
 			</File>
 			<File
@@ -803,11 +803,11 @@
 			Filter="ico;cur;bmp;dlg;rc2;rct;bin;cnt;rtf;gif;jpg;jpeg;jpe"
 			>
 			<File
-				RelativePath="..\..\win32\q2.ico"
+				RelativePath=".\kmq2_2005.rc"
 				>
 			</File>
 			<File
-				RelativePath=".\kmq2_2005.rc"
+				RelativePath="..\..\win32\q2.ico"
 				>
 			</File>
 			<File

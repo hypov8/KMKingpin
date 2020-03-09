@@ -64,7 +64,8 @@ void CL_RequestNextDownload (void)
 {
 	unsigned	map_checksum;		// for detecting cheater maps
 	char		fn[MAX_OSPATH];
-	dmdl_t		*md2header;
+	header_md2_t*md2header;
+	header_mdx_t*mdxheader;
 	dmd3_t		*md3header;
 	dmd3mesh_t	*md3mesh;
 	dsprite_t	*spriteheader;
@@ -84,6 +85,16 @@ void CL_RequestNextDownload (void)
 	// Changed config strings require different parsing
 	if ( LegacyProtocol() )
 	{
+#if ! KINGPIN //hypov8 add???
+		cs_sounds		= CS_SOUNDS;
+		cs_playerskins	= CS_PLAYERSKINS;
+		cs_images		= CS_IMAGES;
+		max_models		= MAX_MODELS;
+		max_sounds		= MAX_SOUNDS;
+		max_images		= MAX_IMAGES;
+		env_cnt			= ENV_CNT;
+		texture_cnt		= TEXTURE_CNT;
+#else
 		cs_sounds		= OLD_CS_SOUNDS;
 		cs_playerskins	= OLD_CS_PLAYERSKINS;
 		cs_images		= OLD_CS_IMAGES;
@@ -92,6 +103,7 @@ void CL_RequestNextDownload (void)
 		max_images		= OLD_MAX_IMAGES;
 		env_cnt			= OLD_ENV_CNT;
 		texture_cnt		= OLD_TEXTURE_CNT;
+#endif
 	}
 	else
 	{
@@ -161,7 +173,7 @@ void CL_RequestNextDownload (void)
 						precache_check++;
 						continue; // couldn't load it
 					}
-					if (LittleLong(*(unsigned *)precache_model) != IDALIASHEADER)
+					if (LittleLong(*(unsigned *)precache_model) != ALIAS_MD2_HEADER)
 					{	// is it an md3?
 						if (LittleLong(*(unsigned *)precache_model) != IDMD3HEADER)
 						{	// is it a sprite?
@@ -200,10 +212,24 @@ void CL_RequestNextDownload (void)
 							}
 						}
 					}
+#if KINGPIN
+					else if (LittleLong(*(unsigned *)precache_model) == ALIAS_MDX_HEADER)
+					{	// get md2 header
+						mdxheader = (header_mdx_t *)precache_model;
+						if (LittleLong (mdxheader->version) != ALIAS_MDX_VERSION)
+						{	// not a recognized mdx
+							FS_FreeFile(precache_model);
+							precache_model = 0;
+							precache_check++;
+							precache_model_skin = 0;
+							continue; // couldn't load it
+						}
+					}
+#endif
 					else
 					{	// get md2 header
-						md2header = (dmdl_t *)precache_model;
-						if (LittleLong (md2header->version) != ALIAS_VERSION)
+						md2header = (header_md2_t *)precache_model;
+						if (LittleLong (md2header->version) != ALIAS_MD2_VERSION)
 						{	// not a recognized md2
 							FS_FreeFile(precache_model);
 							precache_model = 0;
@@ -214,18 +240,18 @@ void CL_RequestNextDownload (void)
 					}
 				}
 
-				if (LittleLong(*(unsigned *)precache_model) == IDALIASHEADER) // md2
+				if (LittleLong(*(unsigned *)precache_model) == ALIAS_MD2_HEADER) // md2
 				{
-					md2header = (dmdl_t *)precache_model;
+					md2header = (header_md2_t *)precache_model;
 					while (precache_model_skin - 1 < LittleLong(md2header->num_skins))
 					{
 						skinname = (char *)precache_model + LittleLong(md2header->ofs_skins) + 
-									(precache_model_skin - 1)*MAX_SKINNAME;
+									(precache_model_skin - 1)*MAX_MD2_SKINNAME;
 
 						// r1ch: spam warning for models that are broken
 						if (strchr (skinname, '\\'))
 							Com_Printf ("Warning, model %s with incorrectly linked skin: %s\n", cl.configstrings[precache_check], skinname);
-						else if (strlen(skinname) > MAX_SKINNAME-1)
+						else if (strlen(skinname) > MAX_MD2_SKINNAME-1)
 							Com_Error (ERR_DROP, "Model %s has too long a skin path: %s", cl.configstrings[precache_check], skinname);
 
 						if (!CL_CheckOrDownloadFile(skinname)) {
@@ -235,6 +261,29 @@ void CL_RequestNextDownload (void)
 						precache_model_skin++;
 					}
 				}
+#if KINGPIN
+				else if (LittleLong(*(unsigned *)precache_model) == ALIAS_MDX_HEADER) // mdx
+				{
+					mdxheader = (header_mdx_t *)precache_model;
+					while (precache_model_skin - 1 < LittleLong(md2header->num_skins))
+					{
+						skinname = (char *)precache_model + LittleLong(md2header->ofs_skins) + 
+									(precache_model_skin - 1)*MAX_MDX_SKINNAME;
+
+						// r1ch: spam warning for models that are broken
+						if (strchr (skinname, '\\'))
+							Com_Printf ("Warning, model %s with incorrectly linked skin: %s\n", cl.configstrings[precache_check], skinname);
+						else if (strlen(skinname) > MAX_MDX_SKINNAME-1)
+							Com_Error (ERR_DROP, "Model %s has too long a skin path: %s", cl.configstrings[precache_check], skinname);
+
+						if (!CL_CheckOrDownloadFile(skinname)) {
+							precache_model_skin++;
+							return; // started a download
+						}
+						precache_model_skin++;
+					}
+				}
+#endif
 				else if (LittleLong(*(unsigned *)precache_model) == IDMD3HEADER) // md3
 				{
 					md3header = (dmd3_t *)precache_model;
@@ -276,7 +325,7 @@ void CL_RequestNextDownload (void)
 						// r1ch: spam warning for models that are broken
 						if (strchr (skinname, '\\'))
 							Com_Printf ("Warning, sprite %s with incorrectly linked skin: %s\n", cl.configstrings[precache_check], skinname);
-						else if (strlen(skinname) > MAX_SKINNAME-1)
+						else if (strlen(skinname) > MAX_MD2_SKINNAME-1)
 							Com_Error (ERR_DROP, "Sprite %s has too long a skin path: %s", cl.configstrings[precache_check], skinname);
 
 						if (!CL_CheckOrDownloadFile(skinname))
@@ -324,7 +373,11 @@ void CL_RequestNextDownload (void)
 		while (precache_check < cs_images+max_images &&
 			cl.configstrings[precache_check][0])
 		{	
+#if KINGPIN //hypov8 todo: "pics/%s.pcx" ok??
+			Com_sprintf(fn, sizeof(fn), "%s", cl.configstrings[precache_check++]);
+#else
 			Com_sprintf(fn, sizeof(fn), "pics/%s.pcx", cl.configstrings[precache_check++]);
+#endif
 			if (!CL_CheckOrDownloadFile(fn))
 				return; // started a download
 		}
@@ -333,6 +386,8 @@ void CL_RequestNextDownload (void)
 	// skins are special, since a player has three things to download:
 	// model, weapon model and skin
 	// so precache_check is now *3
+#if KINGPIN //hypov8 todo: d.l skins
+#endif
 	if (precache_check >= cs_playerskins && precache_check < cs_playerskins + MAX_CLIENTS * PLAYER_MULT)
 	{
 		if (allow_download_players->value)
@@ -440,11 +495,11 @@ void CL_RequestNextDownload (void)
 
 		CM_LoadMap (cl.configstrings[CS_MODELS+1], true, &map_checksum);
 
-		if (map_checksum != atoi(cl.configstrings[CS_MAPCHECKSUM])) {
-			Com_Error (ERR_DROP, "Local map version differs from server: %i != '%s'\n",
-				map_checksum, cl.configstrings[CS_MAPCHECKSUM]);
-			return;
-		}
+	//	if (map_checksum != atoi(cl.configstrings[CS_MAPCHECKSUM])) {
+	//		Com_Error (ERR_DROP, "Local map version differs from server: %i != '%s'\n",
+	//			map_checksum, cl.configstrings[CS_MAPCHECKSUM]);
+	//		return;
+	//	}
 	}
 
 	if (precache_check > env_cnt && precache_check < texture_cnt)
@@ -477,15 +532,18 @@ void CL_RequestNextDownload (void)
 	{
 		// from qcommon/cmodel.c
 		extern int			numtexinfo;
-		extern mapsurface_t	map_surfaces[];
+		extern mapsurface_q2_t	map_surfaces[];
 
 		if (allow_download->value && allow_download_maps->value)
 		{
 			while (precache_tex < numtexinfo)
 			{
 				char fn[MAX_OSPATH];
-
+#if KINGPIN
+				Com_sprintf(fn, sizeof(fn), "textures/%s.tga", map_surfaces[precache_tex++].rname);
+#else
 				Com_sprintf(fn, sizeof(fn), "textures/%s.wal", map_surfaces[precache_tex++].rname);
+#endif
 				if (!CL_CheckOrDownloadFile(fn))
 					return; // started a download
 			}
@@ -500,7 +558,7 @@ void CL_RequestNextDownload (void)
 	{
 		// from qcommon/cmodel.c
 		extern int			numtexinfo;
-		extern mapsurface_t	map_surfaces[];
+		extern mapsurface_q2_t	map_surfaces[];
 
 		if (allow_download->value && allow_download_maps->value && allow_download_textures_24bit->value)
 		{
@@ -521,7 +579,7 @@ void CL_RequestNextDownload (void)
 	if (precache_check == texture_cnt+3)
 	{	// from qcommon/cmodel.c
 		extern int			numtexinfo;
-		extern mapsurface_t	map_surfaces[];
+		extern mapsurface_q2_t	map_surfaces[];
 
 		if (allow_download->value && allow_download_maps->value && allow_download_textures_24bit->value)
 		{
@@ -547,7 +605,7 @@ void CL_RequestNextDownload (void)
 	{
 		// from qcommon/cmodel.c
 		extern int			numtexinfo;
-		extern mapsurface_t	map_surfaces[];
+		extern mapsurface_q2_t	map_surfaces[];
 
 		if (allow_download->value && allow_download_maps->value && allow_download_textures_24bit->value)
 		{
@@ -762,12 +820,20 @@ qboolean CL_CheckOrDownloadFile (char *filename)
 		Com_Printf ("Resuming %s\n", cls.downloadname);
 		MSG_WriteByte (&cls.netchan.message, clc_stringcmd);
 		MSG_WriteString (&cls.netchan.message,
+#if KINGPIN
+			va("download5 %s %i", cls.downloadname, len));
+#else
 			va("download %s %i", cls.downloadname, len));
+#endif
 	}
 	else {
 		Com_Printf ("Downloading %s\n", cls.downloadname);
 		MSG_WriteByte (&cls.netchan.message, clc_stringcmd);
+#if KINGPIN
+		MSG_WriteString (&cls.netchan.message, va("download5 %s", cls.downloadname));
+#else
 		MSG_WriteString (&cls.netchan.message, va("download %s", cls.downloadname));
+#endif
 	}
 
 	cls.downloadnumber++;
@@ -823,8 +889,11 @@ void CL_Download_f (void)
 
 	MSG_WriteByte (&cls.netchan.message, clc_stringcmd);
 	MSG_WriteString (&cls.netchan.message,
+#if KINGPIN
+		va("download5 %s", cls.downloadname));
+#else
 		va("download %s", cls.downloadname));
-
+#endif
 	cls.downloadnumber++;
 }
 
@@ -934,6 +1003,132 @@ void CL_ParseDownload (void)
 }
 
 //=============================================================================
+
+#if KINGPIN
+void CL_ParsePushDownload(void)
+{
+	int		size, percent, offs;
+	float sze;
+	char	name[MAX_OSPATH];
+	int		r;//, i;
+	char out[64];
+	static int lastID = -1;
+
+	// read the data
+	size = MSG_ReadShort (&net_message);
+
+	if (size == -1)
+	{
+		size = MSG_ReadByte (&net_message);
+		Com_Printf ("Server does not have this file.\n");
+
+		if (cls.downloadname)	// Knightmare- save name of failed download
+			CL_AddToFailedDownloadList (cls.downloadname);
+
+		if (cls.download)
+		{
+			// if here, we tried to resume a file but the server said no
+			fclose (cls.download);
+			cls.download = NULL;
+		}
+		CL_RequestNextDownload ();
+		return;
+	}
+
+
+	cls.downloadsize=	MSG_ReadLong (&net_message);
+	cls.downloadid =	MSG_ReadLong (&net_message);
+	cls.downloadposition =	MSG_ReadLong (&net_message) << 10;
+	//FS_Read(SZ_GetSpace(MSG_GetRawMsg(), r), r, cl->download);
+
+	if (lastID != cls.downloadid)
+	{
+		//if not samne id exit!!!
+		lastID = cls.downloadid;
+	}
+
+
+	percent = cls.downloadposition + size;
+
+
+	// open the file if not opened yet
+	if (!cls.download)
+	{
+		CL_Download_Reset_KBps_counter ();	// Knightmare- for KB/s counter
+
+		CL_DownloadFileName(name, sizeof(name), cls.downloadtempname);
+
+		FS_CreatePath (name);
+
+		cls.download = fopen (name, "wb");
+		if (!cls.download)
+		{
+			net_message.readcount += size;
+			Com_Printf ("Failed to open %s\n", cls.downloadtempname);
+			CL_RequestNextDownload ();
+			return;
+		}
+	}
+
+	fwrite (net_message.data + net_message.readcount, 1, size, cls.download);
+	net_message.readcount += size;
+
+	if (percent != cls.downloadsize /*100*/)
+	{
+		// request next block
+// change display routines by zoid
+#if 0
+		Com_Printf (".");
+		if (10*(percent/10) != cls.downloadpercent)
+		{
+			cls.downloadpercent = 10*(percent/10);
+			Com_Printf ("%i%%", cls.downloadpercent);
+		}
+#endif
+		CL_Download_Calculate_KBps (size, cls.downloadsize);	// Knightmare- for KB/s counter
+
+		//sze = (float)percent / (float)cls.downloadsize;
+		//sze = sze * 100.0f;
+		//cls.downloadpercent = (int)sze;
+		cls.downloadpercent =  (int)( ((double)percent/(double)cls.downloadsize) * 100.0);
+
+		offs = (cls.downloadposition+size) >> 10;
+		//Com_sprintf(out, sizeof(out), "nextdl2 %i", offs);
+
+		MSG_WriteByte (&cls.netchan.message, clc_stringcmd);
+		SZ_Print (&cls.netchan.message, va("nextdl2 %i/n", offs));
+		cls.forcePacket = true;
+	}
+	else
+	{
+		char	oldn[MAX_OSPATH];
+		char	newn[MAX_OSPATH];
+
+//		Com_Printf ("100%%\n");
+
+		fclose (cls.download);
+
+		// rename the temp file to it's final name
+		CL_DownloadFileName(oldn, sizeof(oldn), cls.downloadtempname);
+		CL_DownloadFileName(newn, sizeof(newn), cls.downloadname);
+		r = rename (oldn, newn);
+		if (r)
+			Com_Printf ("failed to rename.\n");
+
+		cls.download = NULL;
+		cls.downloadpercent = 0;
+		cls.downloadposition = 0;
+
+		// add new pk3s to search paths, hack by Jay Dolan
+		if (strstr(newn, ".pk3")) 
+			FS_AddPK3File (newn);
+
+		// get another file if needed
+
+		CL_RequestNextDownload ();
+	}
+}
+#endif
 
 // Download speed counter
 

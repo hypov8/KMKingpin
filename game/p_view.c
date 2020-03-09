@@ -1026,11 +1026,13 @@ void G_SetClientEffects (edict_t *ent)
 			if (tr.fraction != 1)
 				VectorMA(tr.endpos,-4,forward,end);
 			VectorCopy(tr.endpos,end);
+#if !KINGPIN //hypov8 todo: dll
 			gi.WriteByte (svc_temp_entity);
 			gi.WriteByte (TE_FLASHLIGHT);
 			gi.WritePosition (end);
 			gi.WriteShort (ent - g_edicts);
 			gi.multicast (end, MULTICAST_PVS);
+#endif
 
 		}
 	}

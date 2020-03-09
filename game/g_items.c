@@ -1106,7 +1106,7 @@ void Drop_PowerArmor (edict_t *ent, gitem_t *item)
 Touch_Item
 ===============
 */
-void Touch_Item (edict_t *ent, edict_t *other, cplane_t *plane, csurface_t *surf)
+void Touch_Item (edict_t *ent, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	qboolean	taken;
 
@@ -1172,7 +1172,7 @@ void Touch_Item (edict_t *ent, edict_t *other, cplane_t *plane, csurface_t *surf
 
 //======================================================================
 
-/*static*/ void drop_temp_touch (edict_t *ent, edict_t *other, cplane_t *plane, csurface_t *surf)
+/*static*/ void drop_temp_touch (edict_t *ent, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if (other == ent->owner)
 		return;

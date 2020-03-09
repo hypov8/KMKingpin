@@ -28,7 +28,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define	SVF_NOCLIENT			0x00000001	// don't send entity to clients, even if it has effects
 #define	SVF_DEADMONSTER			0x00000002	// treat as CONTENTS_DEADMONSTER for collision
 #define	SVF_MONSTER				0x00000004	// treat as CONTENTS_MONSTER for collision
-#define SVF_DAMAGEABLE			0x00000008
+//#define SVF_DAMAGEABLE			0x00000008
+#if KINGPIN //hypov8 todo: check this
+#define	SVF_PROP				0x00000008	// treat as CONTENTS_PROP for collision
+#else
+//!!! r1q2 specific
+#define	SVF_NOPREDICTION		0x00000008	// send this as solid=0 to the client to ignore prediction
+//!!! r1q2 specific
+#endif
 #define SVF_TRIGGER_CAMOWNER    0x00000010
 #define SVF_MUD                 0x00000020
 #define	SVF_GIB					0x00000040	//Knightmare- gib flag
@@ -77,6 +84,12 @@ struct gclient_s
 	int				ping;
 	// the game dll can add anything it wants after
 	// this point in the structure
+	// ONLY read if game dll gives permission through g_features
+	int					clientNum;	// current "pov" client to hide.
+#if KINGPIN //hypov8 todo: above used??
+	int					team;
+	qboolean			noents;
+#endif
 };
 
 
@@ -103,6 +116,10 @@ struct edict_s
 	solid_t		solid;
 	int			clipmask;
 	edict_t		*owner;
+
+#if KINGPIN
+	float		voice_pitch;		// used to pitch voices up/down, 1.0 = same, 2.0 = chipmunk (double speed)
+#endif
 
 	// the game dll can add anything it wants after
 	// this point in the structure
@@ -137,6 +154,10 @@ typedef struct
 	int		(*modelindex) (char *name);
 	int		(*soundindex) (char *name);
 	int		(*imageindex) (char *name);
+
+#if KINGPIN
+	int		(*skinindex) (int modelindex, const char *name);
+#endif
 
 	void	(*setmodel) (edict_t *ent, char *name);
 
@@ -173,6 +194,10 @@ typedef struct
 	void	*(*TagMalloc) (int size, int tag);
 	void	(*TagFree) (void *block);
 	void	(*FreeTags) (int tag);
+#if KINGPIN
+	void	(*ClearObjectBoundsCached) (void);
+	void	(*StopRender) (void);
+#endif
 
 	// console variable interaction
 	cvar_t	*(*cvar) (char *var_name, char *value, int flags);
@@ -189,7 +214,10 @@ typedef struct
 	void	(*AddCommandString) (char *text);
 
 	void	(*DebugGraph) (float value, int color);
-
+#if KINGPIN
+	void	(*GetObjectBounds) (const char *mdx_filename, model_part_t *model_part);
+	void	(*SaveCurrentGame) (void);
+#endif
 	// Knightmare- support game DLL loading from pak files thru engine
 	// This can be used to load script files, etc
 	// Also support open, read/write and closing files
@@ -249,6 +277,11 @@ typedef struct
 	// The game can issue gi.argc() / gi.argv() commands to get the rest
 	// of the parameters
 	void		(*ServerCommand) (void);
+#if KINGPIN
+	int			*(*GetNumObjectBounds) (void);
+	void		*(*GetObjectBoundsPointer) (void);
+	int			(*GetNumJuniors) (void);
+#endif
 
 	//
 	// global variables shared between game and server

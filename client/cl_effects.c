@@ -921,7 +921,8 @@ void CL_ParticleEffectSparks (vec3_t org, vec3_t dir, vec3_t color, int count)
 			0,	0,	0,
 			0.75,		-1.0 / (0.5 + frand()*0.3),
 			GL_SRC_ALPHA, GL_ONE,
-			4,			0, //Knightmare- increase size
+			4,			
+			0, //Knightmare- increase size
 			particle_solid,
 			PART_GRAVITY|PART_SPARK,
 			CL_ParticleSparksThink,true);

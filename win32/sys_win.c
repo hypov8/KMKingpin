@@ -985,9 +985,9 @@ void Sys_Init (void)
 		Sys_Error ("Couldn't get OS info");
 
 	if (osInfo.dwMajorVersion < 4)
-		Sys_Error ("KMQuake2 requires windows version 4 or greater");
+		Sys_Error ( KM_GAME_NAME" requires windows version 4 or greater");
 	if (osInfo.dwPlatformId == VER_PLATFORM_WIN32s)
-		Sys_Error ("KMQuake2 doesn't run on Win32s");
+		Sys_Error ( KM_GAME_NAME" doesn't run on Win32s");
 	else if ( osInfo.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS )
 		s_win95 = true;
 
@@ -1349,3 +1349,19 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 	// never gets here
     return TRUE;
 }
+#if KINGPIN //hypov8 todo: used?
+// MH: worker thread stuff
+intptr_t Sys_StartThread(LPTHREAD_START_ROUTINE func, void *param, int priority)
+{
+	DWORD tid;
+	HANDLE t = CreateThread(NULL, 0, func, param, 0, &tid);
+	SetThreadPriority(t, priority);
+	return (intptr_t)t;
+}
+
+void Sys_WaitThread(intptr_t thread)
+{
+	WaitForSingleObject((HANDLE)thread, INFINITE);
+	CloseHandle((HANDLE)thread);
+}
+#endif

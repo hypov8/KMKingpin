@@ -197,7 +197,7 @@ void gib_think (edict_t *self)
 	}
 }
 
-void gib_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void gib_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	vec3_t	normal_angles, right;
 
@@ -677,6 +677,7 @@ void BecomeExplosion2 (edict_t *self)
 
 void BecomeExplosion3 (edict_t *self)
 {
+#if !KINGPIN //hypov8 todo: dll
 	gi.WriteByte (svc_temp_entity);
 	gi.WriteByte (TE_EXPLOSION1_BIG);
 	gi.WritePosition (self->s.origin);
@@ -684,7 +685,7 @@ void BecomeExplosion3 (edict_t *self)
 
 	if (level.num_reflectors)
 		ReflectExplosion (TE_EXPLOSION1_BIG, self->s.origin);
-
+#endif
 	G_FreeEdict (self);
 }
 
@@ -694,7 +695,7 @@ Pathtarget: gets used when an entity that has
 	this path_corner targeted touches it
 */
 
-void path_corner_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void path_corner_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	vec3_t		v;
 	edict_t		*next;
@@ -792,7 +793,7 @@ when first activated before going after the activator.  If
 hold is selected, it will stay here.
 */
 void tracktrain_drive(edict_t *train, edict_t *other);
-void point_combat_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void point_combat_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	edict_t	*activator;
 
@@ -1074,7 +1075,7 @@ void SP_func_wall (edict_t *self)
 This is solid bmodel that will fall if it's support it removed.
 */
 
-void func_object_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void func_object_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	// only squash thing we fall on top of
 	if (!plane)
@@ -1358,7 +1359,7 @@ void func_explosive_spawn (edict_t *self, edict_t *other, edict_t *activator)
 }
 
 // Lazarus func_explosive can be damaged by impact
-void func_explosive_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void func_explosive_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	int		damage;
 	float	delta;
@@ -1504,7 +1505,7 @@ NOTE: All the pieces must be created after the brush entity, otherwise they will
 */
 
 
-void func_breakaway_hit (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void func_breakaway_hit (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if (surf && (surf->flags & SURF_SKY))
 	{
@@ -1670,7 +1671,7 @@ void func_breakaway_use(edict_t *self, edict_t *other, edict_t *activator)
 	func_breakaway_die (self, self, other, self->speed, vec3_origin);
 }
 
-void func_breakaway_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void func_breakaway_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	int		damage;
 	float	delta;
@@ -1706,7 +1707,9 @@ void func_breakaway_spawn (edict_t *self, edict_t *other, edict_t *activator)
 {
 	self->solid = SOLID_BSP;
 	self->svflags &= ~SVF_NOCLIENT;
+#if !KINGPIN //hypov8 todo: dll
       self->svflags |= SVF_DAMAGEABLE;
+#endif
 	self->use = func_breakaway_use;
 	KillBox (self);
 	gi.linkentity (self);
@@ -1801,7 +1804,7 @@ health (80), and dmg (150).
 gib_type- Set to 3 for barrel-specific gibs.
 */
 
-void barrel_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void barrel_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 
 {
 	float	ratio;
@@ -2501,7 +2504,7 @@ void SP_misc_bigviper (edict_t *ent)
 "dmg"	how much boom should the bomb make?
 */
 void misc_viper_bomb_use (edict_t *, edict_t *, edict_t *);
-void misc_viper_bomb_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void misc_viper_bomb_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	G_UseTargets (self, self->activator);
 
@@ -3267,7 +3270,7 @@ static edict_t *G_PickDestination (char *targetname)
 }
 //=================================================================================
 
-void teleporter_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void teleporter_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	edict_t		*dest;
 	edict_t		*teleporter;
@@ -3335,10 +3338,12 @@ void teleporter_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_
 
 		if(!(self->spawnflags & 16))
 		{
+#if !KINGPIN //hypov8 todo: dll
 			gi.WriteByte(svc_temp_entity);
 			gi.WriteByte(TE_TELEPORT_EFFECT);
 			gi.WritePosition(origin);
 			gi.multicast(origin, MULTICAST_PHS);
+#endif
 		}
 		gi.positioned_sound(origin,self,CHAN_AUTO,self->noise_index,1,1,0);
 	}
@@ -3540,11 +3545,13 @@ void SP_misc_teleporter_dest (edict_t *ent)
 void misc_light_think (edict_t *self)
 {
 	if(self->spawnflags & START_OFF) return;
+#if !KINGPIN //hypov8 todo: dll
 	gi.WriteByte (svc_temp_entity);
 	gi.WriteByte (TE_FLASHLIGHT);
 	gi.WritePosition (self->s.origin);
 	gi.WriteShort (self - g_edicts);
 	gi.multicast (self->s.origin, MULTICAST_PVS);
+#endif
 	self->nextthink = level.time + FRAMETIME;
 }
 
@@ -3644,7 +3651,7 @@ void leaf_fade (edict_t *ent)
 	gi.linkentity(ent);
 }
 
-void drop_touch(edict_t *drop, edict_t *other, cplane_t *plane, csurface_t *surf)
+void drop_touch(edict_t *drop, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if(drop->owner->spawnflags & SF_WEATHER_START_FADE)
 		return;

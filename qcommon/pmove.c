@@ -20,7 +20,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "qcommon.h"
 
-
+#if KINGPIN
+#define WATERLEVEL_FIX // MH: allow shooting in slightly deeper water
+#endif
 
 #define	STEPSIZE	18
 
@@ -37,7 +39,7 @@ typedef struct
 	float		frametime;
 
 
-	csurface_t	*groundsurface;
+	csurface_q2_t	*groundsurface;
 	cplane_t	groundplane;
 	int			groundcontents;
 
@@ -61,7 +63,11 @@ float	pm_accelerate = DEFAULT_ACCELERATE;
 float	pm_stopspeed = DEFAULT_STOPSPEED;
 
 float	pm_wateraccelerate = 10;
+#if KINGPIN //hypov8 todo: 1 ok?
+float	pm_airaccelerate = 1;
+#else
 float	pm_airaccelerate = 0;
+#endif
 float	pm_friction = 6;
 float	pm_waterfriction = 1;
 
@@ -219,6 +225,10 @@ void PM_StepSlideMove_ (void)
 		VectorCopy (trace.plane.normal, planes[numplanes]);
 		numplanes++;
 
+#if KINGPIN
+		if (fabs(trace.plane.normal[2]) < 0.6)
+			pm->wall_collision = 1;
+#endif
 #if 0
 	float		rub;
 
@@ -307,6 +317,35 @@ void PM_StepSlideMove_ (void)
 	{
 		VectorCopy (primal_velocity, pml.velocity);
 	}
+#if KINGPIN
+	if (pm->groundentity && FLOAT_LE_ZERO(pml.velocity[2]))
+	{
+		VectorCopy(pml.origin, end);
+		end[2] -= pml.frametime * 400;
+		trace = pm->trace (pml.origin, pm->mins, pm->maxs, end);
+		if (trace.fraction < 1 && !trace.startsolid)
+			VectorCopy (trace.endpos, pml.origin);
+	}
+	if (pm->s.pm_type == PM_BIKE || pm->s.pm_type == PM_CAR)
+	{
+		float vl = VectorLength(primal_velocity);
+		if (vl - VectorLength(pml.velocity) <= 10)
+			return;
+		VectorAdd(pml.origin, primal_velocity, end);
+		trace = pm->trace (pml.origin, pm->mins, pm->maxs, end);
+		if (trace.fraction < 1 && trace.plane.normal[2] > -0.8 && trace.plane.normal[2] < 0.5)
+		{
+			vec3_t v;
+			VectorNormalize2(primal_velocity, v);
+			VectorAdd(v, trace.plane.normal, v);
+			VectorNormalize(v);
+			VectorScale(v, vl, pml.velocity);
+			if (trace.plane.normal[2] > -0.3)
+				pml.velocity[2] += 180;
+			pm->groundentity = NULL;
+		}
+	}
+#endif
 }
 
 /*
@@ -396,6 +435,10 @@ void PM_Friction (void)
 	float	friction;
 	float	drop;
 	
+#if KINGPIN
+	if (pm->s.pm_type == PM_CAR)
+		return;
+#endif
 	vel = pml.velocity;
 	
 	speed = sqrt(vel[0]*vel[0] +vel[1]*vel[1] + vel[2]*vel[2]);
@@ -412,13 +455,28 @@ void PM_Friction (void)
 	if ((pm->groundentity && pml.groundsurface && !(pml.groundsurface->flags & SURF_SLICK) ) || (pml.ladder) )
 	{
 		friction = pm_friction;
+#if KINGPIN
+		if (pm->s.pm_type == PM_HOVERCAR || pm->s.pm_type == PM_HOVERCAR_GROUND || pm->s.pm_type == PM_BIKE)
+		{
+			friction *= 0.1;
+			if (pm->s.pm_type != PM_BIKE && VectorLength(pml.velocity) > 1000)
+				friction *= 0.3;
+		}
+#endif
 		control = speed < pm_stopspeed ? pm_stopspeed : speed;
 		drop += control*friction*pml.frametime;
 	}
 
 // apply water friction
+#if KINGPIN
+	if (pm->waterlevel >= 2 && !pml.ladder)
+		drop += speed * pm_waterfriction * pm->waterlevel * pml.frametime;
+	else if (pm->s.pm_type == PM_NORMAL_WITH_JETPACK)
+		drop += 2 * speed * pm_waterfriction * pml.frametime;
+#else
 	if (pm->waterlevel && !pml.ladder)
 		drop += speed*pm_waterfriction*pm->waterlevel*pml.frametime;
+#endif
 
 // scale the velocity
 	newspeed = speed - drop;
@@ -446,16 +504,68 @@ void PM_Accelerate (vec3_t wishdir, float wishspeed, float accel)
 	int			i;
 	float		addspeed, accelspeed, currentspeed;
 
+#if KINGPIN
+	if (pm->s.pm_type == PM_CAR)
+		return;
+	if (pm->s.pm_type == PM_HOVERCAR || pm->s.pm_type == PM_HOVERCAR_GROUND || (pm->s.pm_type == PM_BIKE && pm->cmd.forwardmove >= 0))
+	{
+//		vec3_t v;
+		wishspeed += wishspeed;
+		accel *= (float)(VectorLength(pml.velocity) / (2 * pm_maxspeed) * 0.08 + 0.02);
+		if (pm->s.pm_type == PM_BIKE)
+			accel *= 0.75;
+		// MH: Kingpin does this (prevent forward acceleration while moving backwards) but it seems silly
+/*		if (VectorNormalize2(pml.velocity, v) > 0 && DotProduct(v, wishdir) < 0)
+		{
+			wishspeed = 0;
+			VectorCopy(pml.forward, wishdir);
+		}*/
+	}
+	if ((pm->s.pm_type != PM_HOVERCAR_GROUND && pm->s.pm_type != PM_BIKE) || pm->groundentity)
+	{
+#endif
 	currentspeed = DotProduct (pml.velocity, wishdir);
 	addspeed = wishspeed - currentspeed;
 	if (addspeed <= 0)
+#if KINGPIN
+		goto skipaccel;
+#else
 		return;
+#endif
+
 	accelspeed = accel*pml.frametime*wishspeed;
 	if (accelspeed > addspeed)
 		accelspeed = addspeed;
 	
 	for (i=0 ; i<3 ; i++)
 		pml.velocity[i] += accelspeed*wishdir[i];	
+#if KINGPIN
+		wishspeed = accelspeed;
+	}
+skipaccel:
+	if ((((pm->s.pm_type == PM_HOVERCAR || pm->s.pm_type == PM_HOVERCAR_GROUND) && pm->cmd.forwardmove > 0) || pm->s.pm_type == PM_BIKE) && VectorLength(pml.velocity) > 0)
+	{
+		vec3_t v, v2;
+		float len = VectorNormalize2(pml.velocity, v);
+		float t = (pm->s.pm_type == PM_BIKE && pm->groundentity ? 1 : 2 * pml.frametime);
+		float dp = DotProduct(pml.forward, v);
+		if (FLOAT_EQ_ZERO(wishdir[0]) && FLOAT_EQ_ZERO(wishdir[1]))
+			VectorScale(pml.forward, dp > 0 ? t : -t, v2);
+		else if (dp > 0)
+			VectorScale((pm->cmd.forwardmove < 0 ? pml.forward : wishdir), t, v2);
+		else if (pm->cmd.forwardmove <= 0)
+			return;
+		else
+#if 0 // MH: Kingpin does this but it leaves v2 uninitialized (also wishspeed is 0 without the "silly" code above commented out)
+			VectorMA(pml.velocity, wishspeed * 2, wishdir, pml.velocity);
+#else // MH: just returning instead
+			return;
+#endif
+		VectorMA(v2, 1 - t, v, v2);
+		VectorNormalize(v2);
+		VectorScale(v2, len, pml.velocity);
+	}
+#endif
 }
 
 void PM_AirAccelerate (vec3_t wishdir, float wishspeed, float accel)
@@ -631,6 +741,20 @@ void PM_AirMove (void)
 	fmove = pm->cmd.forwardmove;
 	smove = pm->cmd.sidemove;
 	
+#if KINGPIN
+	if (pm->s.pm_type == PM_BIKE)
+	{
+		if (fmove < 0)
+			fmove *= 0.1;
+		smove = 0;
+	}
+	if (pm->s.pm_type == PM_HOVERCAR)
+	{
+		pml.right[2] = 0;
+		VectorNormalize (pml.forward);
+		VectorNormalize (pml.right);
+	}
+#endif
 //!!!!! pitch should be 1/3 so this isn't needed??!
 #if 0
 	pml.forward[2] = 0;
@@ -642,6 +766,10 @@ void PM_AirMove (void)
 	for (i=0 ; i<2 ; i++)
 		wishvel[i] = pml.forward[i]*fmove + pml.right[i]*smove;
 	wishvel[2] = 0;
+#if KINGPIN
+	if (pm->s.pm_type == PM_HOVERCAR)
+		wishvel[2] = pml.forward[2]*fmove + pml.right[2]*smove + pm->cmd.upmove;
+#endif
 
 	PM_AddCurrents (wishvel);
 
@@ -653,12 +781,32 @@ void PM_AirMove (void)
 //
 	maxspeed = (pm->s.pm_flags & PMF_DUCKED) ? pm_duckspeed : pm_maxspeed;
 
+#if KINGPIN
+	if (pm->s.pm_type == PM_HOVERCAR || pm->s.pm_type == PM_HOVERCAR_GROUND || pm->s.pm_type == PM_BIKE)
+		maxspeed += maxspeed;
+#endif
 	if (wishspeed > maxspeed)
 	{
 		VectorScale (wishvel, maxspeed/wishspeed, wishvel);
 		wishspeed = maxspeed;
 	}
 	
+#if KINGPIN
+	if (pm->s.pm_type == PM_HOVERCAR)
+	{
+		PM_Accelerate (wishdir, wishspeed, 3);
+		if (FLOAT_NE_ZERO(wishvel[0]) || FLOAT_NE_ZERO(wishvel[1]) || FLOAT_EQ_ZERO(wishvel[2]))
+			PM_StepSlideMove ();
+		return;
+	}
+	if (pm->s.pm_type == PM_NORMAL_WITH_JETPACK && !pm->groundentity)
+	{
+		PM_Accelerate (wishdir, wishspeed, 10/6.0);
+		if (FLOAT_NE_ZERO(wishvel[0]) || FLOAT_NE_ZERO(wishvel[1]) || FLOAT_EQ_ZERO(wishvel[2]))
+			PM_StepSlideMove ();
+		return;
+	}
+#endif
 	if ( pml.ladder )
 	{
 		PM_Accelerate (wishdir, wishspeed, pm_accelerate);
@@ -686,12 +834,17 @@ void PM_AirMove (void)
 
 // PGM	-- fix for negative trigger_gravity fields
 //		pml.velocity[2] = 0;
+#if !KINGPIN
 		if(pm->s.gravity > 0)
 			pml.velocity[2] = 0;
 		else
+#endif
 			pml.velocity[2] -= pm->s.gravity * pml.frametime;
 // PGM
 
+#if KINGPIN
+		if (pm->s.pm_type!=PM_HOVERCAR_GROUND && pm->s.pm_type!=PM_BIKE)
+#endif
 		if (!pml.velocity[0] && !pml.velocity[1])
 			return;
 		PM_StepSlideMove ();
@@ -730,7 +883,11 @@ void PM_CatagorizePosition (void)
 	point[0] = pml.origin[0];
 	point[1] = pml.origin[1];
 	point[2] = pml.origin[2] - 0.25;
+#if KINGPIN
+	if (pml.velocity[2] > (pm->s.pm_type == PM_HOVERCAR_GROUND || pm->s.pm_type == PM_BIKE ? 360 : 180))
+#else
 	if (pml.velocity[2] > 180) //!!ZOID changed from 100 to 180 (ramp accel)
+#endif
 	{
 		pm->s.pm_flags &= ~PMF_ON_GROUND;
 		pm->groundentity = NULL;
@@ -742,9 +899,33 @@ void PM_CatagorizePosition (void)
 		pml.groundsurface = trace.surface;
 		pml.groundcontents = trace.contents;
 
+#if KINGPIN //hypov8
+		pm->footsteptype = 0;
+		if (!(trace.surface->flags & SURF_CONCRETE))
+		{
+			if (trace.surface->flags & SURF_FABRIC)
+				pm->footsteptype = 1;
+			else if (trace.surface->flags & SURF_GRAVEL)
+				pm->footsteptype = 2;
+			else if (trace.surface->flags & SURF_METAL)
+				pm->footsteptype = 3;
+			else if (trace.surface->flags & SURF_METAL_L)
+				pm->footsteptype = 4;
+			else if (trace.surface->flags & SURF_SNOW)
+				pm->footsteptype = 5;
+			else if (trace.surface->flags & SURF_TILE)
+				pm->footsteptype = 6;
+			else if (trace.surface->flags & SURF_WOOD)
+				pm->footsteptype = 7;
+			else if (trace.surface->flags & SURF_WATER)
+				pm->footsteptype = 8;
+		}
+#endif
+
 		if (!trace.ent || (trace.plane.normal[2] < 0.7 && !trace.startsolid) )
 		{
 // ================= jitclipbug
+#if 0 //hypov8 todo: test?
 			trace_t      trace2;
 			vec3_t      mins, maxs;
 			
@@ -769,6 +950,7 @@ void PM_CatagorizePosition (void)
 		}
 		else if (!trace.ent)
 		{ 
+#endif		
 // ================= end jitclipbug
 			pm->groundentity = NULL;
 			pm->s.pm_flags &= ~PMF_ON_GROUND;
@@ -819,7 +1001,11 @@ void PM_CatagorizePosition (void)
 	pm->watertype = 0;
 
 	sample2 = pm->viewheight - pm->mins[2];
+#ifdef WATERLEVEL_FIX //hypov8 todo: ok?
+	sample1 = sample2 * 0.6f; // MH: weapon is higher than half way up
+#else
 	sample1 = sample2 / 2;
+#endif
 
 	point[2] = pml.origin[2] + pm->mins[2] + 1;	
 	cont = pm->pointcontents (point);
@@ -840,6 +1026,10 @@ void PM_CatagorizePosition (void)
 		}
 	}
 
+#if KINGPIN
+	if (pm->waterlevel == 1)
+		pm->footsteptype = 8;
+#endif
 }
 
 
@@ -850,6 +1040,26 @@ PM_CheckJump
 */
 void PM_CheckJump (void)
 {
+#if KINGPIN
+	if (pm->s.pm_type == PM_NORMAL_WITH_JETPACK)
+	{
+		if (!pm->cmd.upmove)
+			return;
+		if (pm->cmd.upmove > 0)
+		{
+			pml.velocity[2] += 3 * pm->cmd.upmove * pml.frametime;
+			if (pml.velocity[2] > 500)
+				pml.velocity[2] = 500;
+		}
+		else if (pml.velocity[2] < 300)
+			pml.velocity[2] = -300;
+		pm->groundentity = NULL;
+		return;
+	}
+	if (pm->s.pm_type == PM_BIKE)
+		return;
+#endif
+
 	if (pm->s.pm_flags & PMF_TIME_LAND)
 	{	// hasn't been long enough since landing to jump again
 		return;
@@ -883,6 +1093,14 @@ void PM_CheckJump (void)
 			pml.velocity[2] = 50;
 		return;
 	}
+
+#if KINGPIN
+		if (pm->s.pm_type == PM_HOVERCAR || pm->s.pm_type == PM_HOVERCAR_GROUND)
+		{
+//todo
+			return;
+		}
+#endif
 
 	if (pm->groundentity == NULL)
 		return;		// in air, so no effect
@@ -964,7 +1182,13 @@ void PM_FlyMove (qboolean doclip)
 	vec3_t		end;
 	trace_t	trace;
 
+#if KINGPIN
+	float maxspeed = pm_maxspeed;
+
+	pm->viewheight = 36; // MH: originally 40
+#else
 	pm->viewheight = 22;
+#endif
 
 	// friction
 
@@ -997,6 +1221,13 @@ void PM_FlyMove (qboolean doclip)
 	VectorNormalize (pml.forward);
 	VectorNormalize (pml.right);
 
+#if KINGPIN
+	if (pm->s.pm_type == PM_SPECTATOR)
+	{
+		fmove *= 3;
+		maxspeed *= 3;
+	}
+#endif
 	for (i=0 ; i<3 ; i++)
 		wishvel[i] = pml.forward[i]*fmove + pml.right[i]*smove;
 	wishvel[2] += pm->cmd.upmove;
@@ -1007,11 +1238,19 @@ void PM_FlyMove (qboolean doclip)
 	//
 	// clamp to server defined max speed
 	//
+#if KINGPIN
+	if (wishspeed > maxspeed)
+	{
+		VectorScale (wishvel, maxspeed/wishspeed, wishvel);
+		wishspeed = maxspeed;
+	}
+#else
 	if (wishspeed > pm_maxspeed)
 	{
 		VectorScale (wishvel, pm_maxspeed/wishspeed, wishvel);
 		wishspeed = pm_maxspeed;
 	}
+#endif
 
 
 	currentspeed = DotProduct(pml.velocity, wishdir);
@@ -1049,6 +1288,10 @@ Sets mins, maxs, and pm->viewheight
 void PM_CheckDuck (void)
 {
 	trace_t	trace;
+#if !KINGPIN //hypov8 todo:?
+	if (!pm->enhanced)
+#endif
+	{
 
 	pm->mins[0] = -16;
 	pm->mins[1] = -16;
@@ -1066,6 +1309,13 @@ void PM_CheckDuck (void)
 
 	pm->mins[2] = -24;
 
+#if KINGPIN
+		if (pm->s.pm_type == PM_HOVERCAR || pm->s.pm_type == PM_HOVERCAR_GROUND || pm->s.pm_type == PM_BIKE)
+		{
+			pm->mins[2] = -2;
+		}
+		else
+#endif
 	if (pm->s.pm_type == PM_DEAD)
 	{
 		pm->s.pm_flags |= PMF_DUCKED;
@@ -1079,7 +1329,11 @@ void PM_CheckDuck (void)
 		if (pm->s.pm_flags & PMF_DUCKED)
 		{
 			// try to stand up
-			pm->maxs[2] = 32;
+#if KINGPIN
+				pm->maxs[2] = 48;
+#else
+				pm->maxs[2] = 32;
+#endif
 			trace = pm->trace (pml.origin, pm->mins, pm->maxs, pml.origin);
 			if (!trace.allsolid)
 				pm->s.pm_flags &= ~PMF_DUCKED;
@@ -1088,14 +1342,72 @@ void PM_CheckDuck (void)
 
 	if (pm->s.pm_flags & PMF_DUCKED)
 	{
-		pm->maxs[2] = 4;
-		pm->viewheight = -2;
+#if KINGPIN
+			pm->maxs[2] = 24;
+			pm->viewheight = 18;
+#else
+			pm->maxs[2] = 4;
+			pm->viewheight = -2;
+#endif
 	}
 	else
 	{
-		pm->maxs[2] = 32;
-		pm->viewheight = 22;
+#if KINGPIN
+			pm->maxs[2] = 48;
+			pm->viewheight = 36;
+#else
+			pm->maxs[2] = 32;
+			pm->viewheight = 22;
+#endif
 	}
+#if KINGPIN
+		if (pm->s.pm_type == PM_HOVERCAR || pm->s.pm_type == PM_HOVERCAR_GROUND || pm->s.pm_type == PM_BIKE)
+		{
+			pm->mins[0] = -32;
+			pm->mins[1] = -32;
+
+			pm->maxs[0] = 32;
+			pm->maxs[1] = 32;
+		}
+#endif
+	}
+#if !KINGPIN
+	else
+	{
+		if (pm->s.pm_type == PM_GIB)
+		{
+			pm->mins[2] = 0;
+			pm->maxs[2] = 16;
+			pm->viewheight = 8;
+			return;
+		}
+
+		pm->mins[2] = -24;
+
+		if (pm->s.pm_type == PM_DEAD)
+		{
+			pm->s.pm_flags |= PMF_DUCKED;
+		}
+		else if (pm->cmd.upmove < 0 && (pm->s.pm_flags & PMF_ON_GROUND) )
+		{	// duck
+			pm->s.pm_flags |= PMF_DUCKED;
+		}
+		else
+		{	// stand up if possible
+			if (pm->s.pm_flags & PMF_DUCKED)
+			{
+				vec3_t up;
+				FastVectorCopy (pm->maxs, up);
+
+				// try to stand up
+				up[2] *= 2;
+				trace = pm->trace (pml.origin, pm->mins, up, pml.origin);
+				if (!trace.allsolid)
+					pm->s.pm_flags &= ~PMF_DUCKED;
+			}
+		}
+	}
+#endif
 }
 
 
@@ -1333,6 +1645,10 @@ void Pmove (pmove_t *pmove)
 	pm->groundentity = 0;
 	pm->watertype = 0;
 	pm->waterlevel = 0;
+#if KINGPIN //hypov8
+	pm->footsteptype = 0;
+	pm->wall_collision = 0;
+#endif
 
 	// clear all pmove local vars
 	memset (&pml, 0, sizeof(pml));
@@ -1355,6 +1671,10 @@ void Pmove (pmove_t *pmove)
 
 	if (pm->s.pm_type == PM_SPECTATOR)
 	{
+#if !KINGPIN //hypov8 todo: false?
+		pml.frametime *= pm->multiplier;
+#endif
+		//PM_FlyMove (false); //hypov8
 		PM_FlyMove (false);
 		PM_SnapPosition ();
 		return;

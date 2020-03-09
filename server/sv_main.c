@@ -121,11 +121,20 @@ client_t *GetClientFromAdr (netadr_t address)
 	int			i;
 	qboolean	found = false;
 
-	for (i = 0; i < maxclients->value; i++)
+	//hypov8 add: cl. check valid client
+	//posiblle faile from invalid dll
+	if (svs.clients == NULL)
+		return NULL;
+
+
+	for (i = 0; i < (int)maxclients->value; i++)
 	{
 		cl = &svs.clients[i];
-		if (NET_CompareBaseAdr(cl->netchan.remote_address, address)) {
-			found = true; break; }
+		if (cl && NET_CompareBaseAdr(cl->netchan.remote_address, address))  //hypov8 add: cl. check valid client
+		{
+			found = true; 
+			break; 
+		}
 	}
 	if (found)
 		return cl;
@@ -220,7 +229,7 @@ char	*SV_StatusString (void)
 	Q_strncatz (status, "\n", sizeof(status));
 	statusLength = strlen(status);
 
-	for (i=0 ; i<maxclients->value ; i++)
+	for (i=0 ; i<(int)maxclients->value ; i++)
 	{
 		cl = &svs.clients[i];
 		if (cl->state == cs_connected || cl->state == cs_spawned )
@@ -281,12 +290,15 @@ void SVC_Info (void)
 	int		i, count;
 	int		version;
 
-	if (maxclients->value == 1)
+	if ((int)maxclients->value == 1)
 		return;		// ignore in single player
 
 	version = atoi (Cmd_Argv(1));
-
+#if KINGPIN //hypov8 todo: server
+	if (version != OLD_PROTOCOL_VERSION)
+#else
 	if (version != PROTOCOL_VERSION)
+#endif
 	{	// According to r1ch, this can be used to make servers endlessly ping each other
 	//	Com_sprintf (string, sizeof(string), "%s: wrong version\n", hostname->string, sizeof(string));
 		return;
@@ -294,7 +306,7 @@ void SVC_Info (void)
 	else
 	{
 		count = 0;
-		for (i=0 ; i<maxclients->value ; i++)
+		for (i=0 ; i<(int)maxclients->value ; i++)
 			if (svs.clients[i].state >= cs_connected)
 				count++;
 
@@ -388,7 +400,12 @@ void SVC_DirectConnect (void)
 	Com_DPrintf ("SVC_DirectConnect ()\n");
 
 	version = atoi(Cmd_Argv(1));
-	if (version != PROTOCOL_VERSION)
+
+#if KINGPIN //hypov8 todo: server
+	if (version !=  OLD_PROTOCOL_VERSION)
+#else
+	if (version != PROTOCOL_VERSION )
+#endif
 	{
 		Netchan_OutOfBandPrint (NS_SERVER, adr, "print\nServer is version %4.2f.\n", VERSION);
 		Com_DPrintf ("    rejected connect from version %i\n", version);
@@ -463,7 +480,7 @@ void SVC_DirectConnect (void)
 	memset (newcl, 0, sizeof(client_t));
 
 	// if there is already a slot for this ip, reuse it
-	for (i=0,cl=svs.clients ; i<maxclients->value ; i++,cl++)
+	for (i=0,cl=svs.clients ; i<(int)maxclients->value ; i++,cl++)
 	{
 		if (cl->state == cs_free)
 			continue;
@@ -499,7 +516,7 @@ void SVC_DirectConnect (void)
 
 	// find a client slot
 	newcl = NULL;
-	for (i=0,cl=svs.clients ; i<maxclients->value ; i++,cl++)
+	for (i=0,cl=svs.clients ; i<(int)maxclients->value ; i++,cl++)
 	{
 		if (cl->state == cs_free)
 		{
@@ -520,6 +537,10 @@ gotnewcl:
 	// this is the only place a client_t is ever initialized
 	*newcl = temp;
 	sv_client = newcl;
+#if KINGPIN //add hypov8 memset was missing??
+	//SV_CleanClient (newcl);
+	memset (newcl, 0, sizeof(*newcl));
+#endif
 	edictnum = (newcl-svs.clients)+1;
 	ent = EDICT_NUM(edictnum);
 	newcl->edict = ent;
@@ -680,7 +701,7 @@ void SV_CalcPings (void)
 	client_t	*cl;
 	int			total, count;
 
-	for (i=0 ; i<maxclients->value ; i++)
+	for (i=0 ; i<(int)maxclients->value ; i++)
 	{
 		cl = &svs.clients[i];
 		if (cl->state != cs_spawned )
@@ -734,7 +755,7 @@ void SV_GiveMsec (void)
 	if (sv.framenum & 15)
 		return;
 
-	for (i=0 ; i<maxclients->value ; i++)
+	for (i=0 ; i<(int)maxclients->value ; i++)
 	{
 		cl = &svs.clients[i];
 		if (cl->state == cs_free )
@@ -773,7 +794,7 @@ void SV_ReadPackets (void)
 		qport = MSG_ReadShort (&net_message) & 0xffff;
 
 		// check for packets from connected clients
-		for (i=0, cl=svs.clients ; i<maxclients->value ; i++,cl++)
+		for (i=0, cl=svs.clients ; i<(int)maxclients->value ; i++,cl++)
 		{
 			if (cl->state == cs_free)
 				continue;
@@ -798,7 +819,7 @@ void SV_ReadPackets (void)
 			break;
 		}
 		
-		if (i != maxclients->value)
+		if (i != (int)maxclients->value)
 			continue;
 	}
 }
@@ -826,7 +847,7 @@ void SV_CheckTimeouts (void)
 	droppoint = svs.realtime - 1000*timeout->value;
 	zombiepoint = svs.realtime - 1000*zombietime->value;
 
-	for (i=0,cl=svs.clients ; i<maxclients->value ; i++,cl++)
+	for (i=0,cl=svs.clients ; i<(int)maxclients->value ; i++,cl++)
 	{
 		// message times may be wrong across a changelevel
 		if (cl->lastmessage > svs.realtime)
@@ -892,7 +913,7 @@ void SV_RunGameFrame (void)
 	sv.time = sv.framenum*100;
 
 	// don't run if paused
-	if (!sv_paused->value || maxclients->value > 1)
+	if (!sv_paused->value || (int)maxclients->value > 1)
 	{
 		ge->RunFrame ();
 
@@ -1116,7 +1137,11 @@ void SV_Init (void)
 	Cvar_Get ("fraglimit", "0", CVAR_SERVERINFO);
 	Cvar_Get ("timelimit", "0", CVAR_SERVERINFO);
 	Cvar_Get ("cheats", "0", CVAR_SERVERINFO|CVAR_LATCH);
+#if KINGPIN //hypov8 todo: server
+	Cvar_Get ("protocol", va("%i", OLD_PROTOCOL_VERSION), CVAR_SERVERINFO|CVAR_NOSET);;
+#else
 	Cvar_Get ("protocol", va("%i", PROTOCOL_VERSION), CVAR_SERVERINFO|CVAR_NOSET);;
+#endif
 	maxclients = Cvar_Get ("maxclients", "1", CVAR_SERVERINFO | CVAR_LATCH);
 	hostname = Cvar_Get ("hostname", "noname", CVAR_SERVERINFO | CVAR_ARCHIVE);
 	timeout = Cvar_Get ("timeout", "125", 0);
@@ -1133,7 +1158,7 @@ void SV_Init (void)
 	allow_download_pics  = Cvar_Get ("allow_download_pics", "1", CVAR_ARCHIVE);
 	allow_download_textures  = Cvar_Get ("allow_download_textures", "1", CVAR_ARCHIVE);
 	// Knightmare- whether to allow downloading 24-bit textures
-	allow_download_textures_24bit = Cvar_Get ("allow_download_textures_24bit", "0", CVAR_ARCHIVE);
+	allow_download_textures_24bit = Cvar_Get ("allow_download_textures_24bit", "1", CVAR_ARCHIVE); //hypov8 edit: was 0
 
 	sv_downloadserver = Cvar_Get ("sv_downloadserver", "", 0);	// r1ch: http dl server
 
@@ -1183,12 +1208,12 @@ void SV_FinalMessage (char *message, qboolean reconnect)
 	// send it twice
 	// stagger the packets to crutch operating system limited buffers
 
-	for (i=0, cl = svs.clients ; i<maxclients->value ; i++, cl++)
+	for (i=0, cl = svs.clients ; i<(int)maxclients->value ; i++, cl++)
 		if (cl->state >= cs_connected)
 			Netchan_Transmit (&cl->netchan, net_message.cursize
 			, net_message.data);
 
-	for (i=0, cl = svs.clients ; i<maxclients->value ; i++, cl++)
+	for (i=0, cl = svs.clients ; i<(int)maxclients->value ; i++, cl++)
 		if (cl->state >= cs_connected)
 			Netchan_Transmit (&cl->netchan, net_message.cursize
 			, net_message.data);

@@ -325,6 +325,12 @@ extern  cvar_t  *r_bloom;
 extern	cvar_t	*vid_fullscreen;
 extern	cvar_t	*vid_gamma;
 
+#if KINGPIN
+extern cvar_t	*r_maxtexsize;
+extern cvar_t	*m_pitch;
+
+#endif
+
 
 extern	int		gl_lightmap_format;
 extern	int		gl_solid_format;
@@ -479,6 +485,11 @@ void R_ScreenShot_PNG_f (void);
 //
 void R_DrawAliasMD2Model (entity_t *e);
 void R_DrawAliasMD2ModelShadow (entity_t *e);
+#if KINGPIN
+void R_DrawAliasMDXModel (entity_t *e);
+void R_DrawAliasMDXModelShadow (entity_t *e);
+#endif
+
 //Harven++ MD3
 void R_DrawAliasModel (entity_t *e);
 void R_DrawAliasModelShadow (entity_t *e);
@@ -664,6 +675,8 @@ void GL_ResampleTexture (void *indata, int inwidth, int inheight, void *outdata,
 struct image_s *R_RegisterSkin (char *name);
 
 void LoadPCX (char *filename, byte **pic, byte **palette, int *width, int *height);
+void LoadPCX2 (char *filename, byte **pic, byte **palette, int *width, int *height); //hypov8 update to use internal pallet
+
 //Knightmare added
 void LoadTGA (char *name, byte **pic, int *width, int *height);
 void LoadJPG (char *filename, byte **pic, int *width, int *height);

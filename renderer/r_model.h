@@ -41,7 +41,7 @@ BRUSH MODELS
 typedef struct
 {
 	vec3_t		position;
-} mvertex_t;
+} mvertex_q2_t;
 
 typedef struct
 {
@@ -215,7 +215,11 @@ typedef struct mleaf_s
 //
 
 //Harven++ MD3 added mod_md3
-typedef enum {mod_bad, mod_brush, mod_sprite, mod_alias, mod_md2 } modtype_t;
+typedef enum {mod_bad, mod_brush, mod_sprite, mod_alias_md3, mod_alias_md2
+#if KINGPIN
+, mod_alias_mdx
+#endif
+} modtype_t;
 //Harven-- MD3
 
 typedef struct model_s
@@ -257,7 +261,7 @@ typedef struct model_s
 	mleaf_t		*leafs;
 
 	int			numvertexes;
-	mvertex_t	*vertexes;
+	mvertex_q2_t	*vertexes;
 
 	int			numedges;
 	medge_t		*edges;
@@ -278,13 +282,13 @@ typedef struct model_s
 	int			nummarksurfaces;
 	msurface_t	**marksurfaces;
 
-	dvis_t		*vis;
+	dvis_q2_t		*vis;
 
 	byte		*lightdata;
 
 	// for alias models and skins
 	// Echon's per-mesh skin support
-	image_t      *skins[MD3_MAX_MESHES][MAX_MD2SKINS];
+	image_t      *skins[MD3_MAX_MESHES][MAX_MD2_SKINS];
 	//image_t		*skins[MAX_MD2SKINS];
 
 	int			extradatasize;
@@ -296,6 +300,12 @@ typedef struct model_s
 	//signed int	edge_tri[MAX_TRIANGLES][3]; // make this dynamically allocated?
 	int			*edge_tri;
 #endif // end projection shadows from BeefQuake R6
+
+#ifdef PROJECTION_MDX_SHADOWS // projection shadows from BeefQuake R6
+	int			*edge_mdx_tri;
+#endif // end projection shadows from BeefQuake R6
+
+
 } model_t;
 
 //============================================================================

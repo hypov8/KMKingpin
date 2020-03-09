@@ -314,7 +314,7 @@ fire_blaster
 Fires a single blaster bolt.  Used by the blaster and hyper blaster.
 =================
 */
-void blaster_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void blaster_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	int		mod;
 	int		tempevent;
@@ -341,6 +341,7 @@ void blaster_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *
 	}
 	else
 	{
+#if !KINGPIN //hypov8 todo: dll
 		if (self->style == BLASTER_GREEN) //green
 			tempevent = TE_BLASTER2;
 		else if (self->style == BLASTER_BLUE) //blue
@@ -354,6 +355,7 @@ void blaster_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *
 			tempevent =  TE_REDBLASTER;
 	#endif
 		else //standard yellow
+#endif
 			tempevent = TE_BLASTER;
 
 		gi.WriteByte (svc_temp_entity);
@@ -635,7 +637,7 @@ void Grenade_Evade (edict_t *monster)
 	G_FreeEdict (ent);
 }
 
-/*static*/ void Grenade_Touch (edict_t *ent, edict_t *other, cplane_t *plane, csurface_t *surf)
+/*static*/ void Grenade_Touch (edict_t *ent, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if (other == ent->owner)
 		return;
@@ -667,7 +669,7 @@ void Grenade_Evade (edict_t *monster)
 	Grenade_Explode (ent);
 }
 
-/*static*/ void ContactGrenade_Touch (edict_t *ent, edict_t *other, cplane_t *plane, csurface_t *surf)
+/*static*/ void ContactGrenade_Touch (edict_t *ent, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if (other == ent->owner)
 		return;
@@ -1024,7 +1026,7 @@ void Rocket_Evade (edict_t *rocket, vec3_t	dir, float speed)
 }
 
 
-void rocket_touch (edict_t *ent, edict_t *other, cplane_t *plane, csurface_t *surf)
+void rocket_touch (edict_t *ent, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	vec3_t	origin;
 	int		n;
@@ -1257,10 +1259,12 @@ void fire_rail (edict_t *self, vec3_t start, vec3_t aimdir, int damage, int kick
 	qboolean	water;
 
 	//Knightmare- changeable trail color
+#if !KINGPIN //hypov8 todo: dll
 #ifdef KMQUAKE2_ENGINE_MOD
 	if (self->client && sk_rail_color->value == 2)
 		tempevent = TE_RAILTRAIL2;
 	else
+#endif
 #endif
 		tempevent = TE_RAILTRAIL;
 
@@ -1372,7 +1376,7 @@ void bfg_explode (edict_t *self)
 		self->think = G_FreeEdict;
 }
 
-void bfg_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void bfg_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if (other == self->owner)
 		return;

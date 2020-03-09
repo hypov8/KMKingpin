@@ -191,6 +191,13 @@ cvar_t  *r_bloom;	// BLOOMS
 cvar_t	*r_skydistance; //Knightmare- variable sky range
 cvar_t	*r_saturation;	//** DMP
 
+#if KINGPIN
+cvar_t	*r_maxtexsize;
+cvar_t	*m_pitch;
+cvar_t	*kk_intensity;
+cvar_t	*r_debug_lighting;
+#endif
+
 
 /*
 =================
@@ -888,14 +895,25 @@ void AssertCvarRange (cvar_t *var, float min, float max, qboolean isInteger)
 void R_Register (void)
 {
 	// added Psychospaz's console font size option
+#if KINGPIN //hypov8 todo: move to existing cvar
+	r_picmip = Cvar_Get ("gl_picmip", "0", 0);
+	r_polyblend = Cvar_Get ("gl_polyblend", "2", 0);
+	r_maxtexsize =  Cvar_Get ("gl_maxtexsize", "512", 0);
+	m_pitch =   Cvar_Get ("m_pitch", "0.22", 0);
+	kk_intensity =   Cvar_Get ("intensity", "2", 0);
+	r_debug_lighting =   Cvar_Get ("r_debug_lighting", "0", 0);
+
+	con_font = Cvar_Get ("con_font", "newfont", CVAR_ARCHIVE);	//hypov8 edit: allow loading default kp console char's.
+#else															//unless this is set or file exists
 	con_font = Cvar_Get ("con_font", "default", CVAR_ARCHIVE);
+#endif
 	con_font_size = Cvar_Get ("con_font_size", "8", CVAR_ARCHIVE);
 	alt_text_color = Cvar_Get ("alt_text_color", "2", CVAR_ARCHIVE);
 	scr_netgraph_pos = Cvar_Get ("netgraph_pos", "0", CVAR_ARCHIVE);
 
 	gl_driver = Cvar_Get( "gl_driver", "opengl32", CVAR_ARCHIVE );
 	gl_allow_software = Cvar_Get( "gl_allow_software", "0", 0 );
-	gl_clear = Cvar_Get ("gl_clear", "0", 0);
+	gl_clear = Cvar_Get ("gl_clear", "0", CVAR_CHEAT);
 
 	r_lefthand = Cvar_Get( "hand", "0", CVAR_USERINFO | CVAR_ARCHIVE );
 	r_norefresh = Cvar_Get ("r_norefresh", "0", CVAR_CHEAT);
@@ -906,7 +924,7 @@ void R_Register (void)
 	r_nocull = Cvar_Get ("r_nocull", "0", CVAR_CHEAT);
 	r_lerpmodels = Cvar_Get ("r_lerpmodels", "1", 0);
 	r_speeds = Cvar_Get ("r_speeds", "0", 0);
-	r_ignorehwgamma = Cvar_Get ("r_ignorehwgamma", "0", CVAR_ARCHIVE);	// hardware gamma
+	r_ignorehwgamma = Cvar_Get ("r_ignorehwgamma", "1", CVAR_ARCHIVE);	// hardware gamma
 	r_displayrefresh = Cvar_Get ("r_displayrefresh", "0", CVAR_ARCHIVE); // refresh rate control
 	AssertCvarRange (r_displayrefresh, 0, 150, true);
 
@@ -941,13 +959,15 @@ void R_Register (void)
 	r_shadows = Cvar_Get ("r_shadows", "0", CVAR_ARCHIVE );
 	r_shadowalpha = Cvar_Get ("r_shadowalpha", "0.4", CVAR_ARCHIVE );
 	r_shadowrange  = Cvar_Get ("r_shadowrange", "768", CVAR_ARCHIVE );
-	r_shadowvolumes = Cvar_Get ("r_shadowvolumes", "0", CVAR_CHEAT );
+	r_shadowvolumes = Cvar_Get ("r_shadowvolumes", "0", 0/*CVAR_CHEAT*/ );
 	r_stencil = Cvar_Get ("r_stencil", "1", CVAR_ARCHIVE );
 
 	r_dynamic = Cvar_Get ("r_dynamic", "1", 0);
 	r_nobind = Cvar_Get ("r_nobind", "0", CVAR_CHEAT);
 	r_round_down = Cvar_Get ("r_round_down", "1", 0);
+#if !KINGPIN
 	r_picmip = Cvar_Get ("r_picmip", "0", 0);
+#endif
 	r_skymip = Cvar_Get ("r_skymip", "0", 0);
 	r_showtris = Cvar_Get ("r_showtris", "0", CVAR_CHEAT);
 	r_showbbox = Cvar_Get ("r_showbbox", "0", CVAR_CHEAT); // show model bounding box
@@ -980,7 +1000,7 @@ void R_Register (void)
 	r_newlightmapformat = Cvar_Get("r_newlightmapformat", "1", CVAR_ARCHIVE);	// whether to use new lightmap format
 
 	// added Vic's RGB brightening
-	r_ext_mtexcombine = Cvar_Get ("r_ext_mtexcombine", "1", CVAR_ARCHIVE);
+	r_ext_mtexcombine = Cvar_Get ("r_ext_mtexcombine", "0", CVAR_ARCHIVE); //hypov8 was 1
 
 	// Echon's two-sided stenciling
 	r_stencilTwoSide = Cvar_Get ("r_stencilTwoSide", "0", CVAR_ARCHIVE);
@@ -1028,7 +1048,7 @@ void R_Register (void)
 
 	r_3dlabs_broken = Cvar_Get( "r_3dlabs_broken", "1", CVAR_ARCHIVE );
 
-	vid_fullscreen = Cvar_Get( "vid_fullscreen", "1", CVAR_ARCHIVE );
+	vid_fullscreen = Cvar_Get( "vid_fullscreen", "0", CVAR_ARCHIVE );
 	vid_gamma = Cvar_Get( "vid_gamma", "0.8", CVAR_ARCHIVE ); // was 1.0
 	vid_ref = Cvar_Get( "vid_ref", "gl", CVAR_ARCHIVE );
 

@@ -44,6 +44,18 @@ MAIN MENU
 
 #define	MAIN_ITEMS	5
 
+#if KINGPIN
+char *main_names[] =
+{
+	"m_game",
+	"m_gang",
+	"m_option",
+	"m_visuals",
+	"m_exit",
+	0
+};
+
+#else
 char *main_names[] =
 {
 	"m_main_game",
@@ -53,7 +65,7 @@ char *main_names[] =
 	"m_main_quit",
 	0
 };
-
+#endif
 
 /*
 =============
@@ -72,11 +84,19 @@ void FindMenuCoords (int *xoffset, int *ystart, int *totalheight, int *widest)
 		R_DrawGetPicSize (&w, &h, main_names[i]);
 		if (w > *widest)
 			*widest = w;
+#if KINGPIN
+		h = 22;
+#endif
 		*totalheight += (h + 12);
 	}
 
 	*xoffset = (SCREEN_WIDTH - *widest + 70) * 0.5;
 	*ystart = SCREEN_HEIGHT*0.5 - 100;
+#if KINGPIN
+		*xoffset= KP_MAINMENUPOS_X;
+		*ystart = KP_MAINMENUPOS_Y;
+#endif
+
 }
 
 
@@ -91,6 +111,7 @@ and both above and below y.
 */
 void UI_DrawMainCursor (int x, int y, int f)
 {
+#if !KINGPIN //hypov8 disable: animated cursor?
 	char	cursorname[80];
 	static	qboolean cached;
 	int		w,h;
@@ -109,6 +130,7 @@ void UI_DrawMainCursor (int x, int y, int f)
 	Com_sprintf (cursorname, sizeof(cursorname), "m_cursor%d", f);
 	R_DrawGetPicSize (&w, &h, cursorname);
 	SCR_DrawPic (x, y, w, h, ALIGN_CENTER, cursorname, 1.0);
+#endif
 }
 
 
@@ -195,24 +217,44 @@ void M_Main_Draw (void)
 
 	FindMenuCoords (&xoffset, &ystart, &totalheight, &widest);
 
+#if KINGPIN //draw top left menu bg. moved from below. fix sort issue
+	R_DrawGetPicSize (&w, &h, "main");
+	SCR_DrawPic (0, 0, w, h, ALIGN_LEFT, "main", 1.0f);//menu_alpha->value
 	for (i = 0; main_names[i] != 0; i++)
-		if (i != m_main_cursor) {
+	{
+		R_DrawGetPicSize(&w, &h, main_names[i]);
+		h = 22;
+
+		if (i != m_main_cursor)
+			SCR_DrawPic(xoffset - (w*0.5), ystart + (i * 2 * h), w, h, ALIGN_LEFT, main_names[i], 1.0f);//menu_alpha->value
+		else
+			SCR_DrawPic(xoffset - (w*0.5), ystart + (i * 2 * h), w, h, ALIGN_LEFT, va("%s2", main_names[i]), 1.0);
+	}
+
+	//UI_DrawMainCursor (xoffset, ystart+(m_main_cursor*22*2+1), (int)(cls.realtime/100)%NUM_MAINMENU_CURSOR_FRAMES);
+
+#else
+	for (i = 0; main_names[i] != 0; i++)
+		if (i != m_main_cursor) 
+		{
 			R_DrawGetPicSize (&w, &h, main_names[i]);
-			SCR_DrawPic (xoffset, (ystart + i*40+3), w, h, ALIGN_CENTER, main_names[i], 1.0);
+			SCR_DrawPic (xoffset, (ystart + i*40+3), w, h, ALIGN_LEFT, main_names[i], 1.0);
 		}
 
-//	strncpy (litname, main_names[m_main_cursor]);
-//	strncat (litname, "_sel");
-	Q_strncpyz (litname, main_names[m_main_cursor], sizeof(litname));
+
+
+
 	Q_strncatz (litname, "_sel", sizeof(litname));
 	R_DrawGetPicSize (&w, &h, litname);
 	SCR_DrawPic (xoffset-1, (ystart + m_main_cursor*40+2), w+2, h+2, ALIGN_CENTER, litname, 1.0);
 
 	// Draw our nifty quad damage model as a cursor if it's loaded.
+
 	if (quadModel_loaded)
 		UI_DrawMainCursor3D (xoffset-27, ystart+(m_main_cursor*40+1));
 	else
-		UI_DrawMainCursor (xoffset-25, ystart+(m_main_cursor*40+1), (int)(cls.realtime/100)%NUM_MAINMENU_CURSOR_FRAMES);
+
+	UI_DrawMainCursor (xoffset-25, ystart+(m_main_cursor*40+1), (int)(cls.realtime/100)%NUM_MAINMENU_CURSOR_FRAMES);
 
 	R_DrawGetPicSize (&w, &h, "m_main_plaque");
 	SCR_DrawPic (xoffset-(w/2+50), ystart, w, h, ALIGN_CENTER, "m_main_plaque", 1.0);
@@ -220,6 +262,8 @@ void M_Main_Draw (void)
 
 	R_DrawGetPicSize (&w, &h, "m_main_logo");
 	SCR_DrawPic (xoffset-(w/2+50), ystart+last_h+20, w, h, ALIGN_CENTER, "m_main_logo", 1.0);
+#endif
+
 }
 
 
@@ -275,8 +319,11 @@ void UI_CheckMainMenuMouse (void)
 
 	FindMenuCoords(&xoffset, &ystart, &totalheight, &widest);
 	for (i = 0; main_names[i] != 0; i++)
+#if KINGPIN
+		UI_AddMainButton (&buttons[i], i, xoffset-65, ystart+(i*2*22), main_names[i]);
+#else
 		UI_AddMainButton (&buttons[i], i, xoffset, ystart+(i*40+3), main_names[i]);
-
+#endif
 	// Exit with double click 2nd mouse button
 	if (!cursor.buttonused[MOUSEBUTTON2] && cursor.buttonclicks[MOUSEBUTTON2]==2)
 	{

@@ -53,7 +53,7 @@ Con_DrawString
 */
 void Con_DrawString (int x, int y, char *string, int alpha)
 {
-	DrawStringGeneric (x, y, string, alpha, SCALETYPE_CONSOLE, false);
+	DrawStringGeneric (x, y, string, alpha, SCALETYPE_CONSOLE, false, -1, -1, -1);
 }
 
 
@@ -103,7 +103,7 @@ void Con_ToggleConsole_f (void)
 	else
 	{
 		cls.consoleActive = true; // Knightmare added
-		//UI_ForceMenuOff ();
+		UI_ForceMenuOff (); //hypov8 re'enable
 		//cls.key_dest = key_console;	
 
 		if (Cvar_VariableValue ("maxclients") == 1 
@@ -695,15 +695,15 @@ void Con_DrawConsole (float frac, qboolean trans)
 	// changed to "KMQuake2 vx.xx"
 #ifdef ERASER_COMPAT_BUILD
 #ifdef NET_SERVER_BUILD
-	Com_sprintf (version, sizeof(version), S_COLOR_BOLD S_COLOR_SHADOW S_COLOR_ALT"KMQuake2 v%4.2f (Eraser net server)", VERSION);
+	Com_sprintf (version, sizeof(version), S_COLOR_BOLD S_COLOR_SHADOW S_COLOR_ALT KM_GAME_NAME" v%4.2f (Eraser net server)", VERSION);
 #else // NET_SERVER_BUILD
-	Com_sprintf (version, sizeof(version), S_COLOR_BOLD S_COLOR_SHADOW S_COLOR_ALT"KMQuake2 v%4.2f (Eraser compatible)", VERSION);
+	Com_sprintf (version, sizeof(version), S_COLOR_BOLD S_COLOR_SHADOW S_COLOR_ALT KM_GAME_NAME" v%4.2f (Eraser compatible)", VERSION);
 #endif // NET_SERVER_BUILD
 #else // ERASER_COMPAT_BUILD
 #ifdef NET_SERVER_BUILD
-	Com_sprintf (version, sizeof(version), S_COLOR_BOLD S_COLOR_SHADOW S_COLOR_ALT"KMQuake2 v%4.2f (net server)", VERSION);
+	Com_sprintf (version, sizeof(version), S_COLOR_BOLD S_COLOR_SHADOW S_COLOR_ALT KM_GAME_NAME" v%4.2f (net server)", VERSION);
 #else
-	Com_sprintf (version, sizeof(version), S_COLOR_BOLD S_COLOR_SHADOW S_COLOR_ALT"KMQuake2 v%4.2f", VERSION);
+	Com_sprintf (version, sizeof(version), S_COLOR_BOLD S_COLOR_SHADOW S_COLOR_ALT KM_GAME_NAME" v%4.2f", VERSION);
 #endif // ERASER_COMPAT_BUILD
 #endif // NEW_ENTITY_STATE_MEMBERS
 
@@ -724,12 +724,12 @@ void Con_DrawConsole (float frac, qboolean trans)
 		for (x=0; x<con.linewidth; x+=4)
 			R_DrawChar( (x+1)*FONT_SIZE, y, '^', CON_FONT_SCALE, 255, 0, 0, 255, false, ((x+4)>=con.linewidth) );
 	
-		y -= FONT_SIZE;
+		y -= 1.25*FONT_SIZE;
 		rows--;
 	}
 	
 	row = con.display;
-	for (i=0; i<rows; i++, y-=FONT_SIZE, row--)
+	for (i=0; i<rows; i++, y-=1.25*FONT_SIZE, row--)
 	{
 		if (row < 0)
 			break;

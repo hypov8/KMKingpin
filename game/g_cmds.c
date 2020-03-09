@@ -1556,11 +1556,13 @@ void DrawBBox(edict_t *ent)
 	VectorCopy(ent->s.origin,origin);
 	VectorSet(p1,origin[0]+ent->mins[0],origin[1]+ent->mins[1],origin[2]+ent->mins[2]);
 	VectorSet(p2,origin[0]+ent->mins[0],origin[1]+ent->mins[1],origin[2]+ent->maxs[2]);
+#if !KINGPIN //hypov8 todo: dll
 	gi.WriteByte (svc_temp_entity);
 	gi.WriteByte (TE_DEBUGTRAIL);
 	gi.WritePosition (p1);
 	gi.WritePosition (p2);
 	gi.multicast (p1, MULTICAST_ALL);
+
 	VectorSet(p2,origin[0]+ent->mins[0],origin[1]+ent->maxs[1],origin[2]+ent->mins[2]);
 	gi.WriteByte (svc_temp_entity);
 	gi.WriteByte (TE_DEBUGTRAIL);
@@ -1633,6 +1635,7 @@ void DrawBBox(edict_t *ent)
 	gi.WritePosition (p1);
 	gi.WritePosition (p2);
 	gi.multicast (p1, MULTICAST_ALL);
+#endif
 }
 
 void Cmd_Bbox_f (edict_t *ent)
@@ -1807,12 +1810,14 @@ void decoy_think(edict_t *self)
 
 void forcewall_think(edict_t *self)
 {
+#if !KINGPIN //hypov8 todo: dll
 	gi.WriteByte (svc_temp_entity);
 	gi.WriteByte (TE_FORCEWALL);
 	gi.WritePosition (self->pos1);
 	gi.WritePosition (self->pos2);
 	gi.WriteByte  (self->style);
 	gi.multicast (self->s.origin, MULTICAST_PVS);
+#endif
 	self->nextthink = level.time + FRAMETIME;
 }
 
@@ -1969,7 +1974,7 @@ void ClientCommand (edict_t *ent)
 		Cmd_Drop_f (ent);
 	else if (Q_stricmp (cmd, "give") == 0)
 		Cmd_Give_f (ent);
-	else if (Q_stricmp (cmd, "god") == 0)
+	else if (Q_stricmp (cmd, "immortal") == 0) //KINGPIN
 		Cmd_God_f (ent);
 	else if (Q_stricmp (cmd, "notarget") == 0)
 		Cmd_Notarget_f (ent);

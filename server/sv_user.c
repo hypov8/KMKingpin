@@ -23,6 +23,179 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 edict_t	*sv_player;
 
+
+#if KINGPIN
+download_t *downloads = NULL;
+#if 0
+#ifdef _WIN32
+static unsigned __stdcall CacheDownload(void *arg)
+#else
+static void *CacheDownload(void *arg)
+#endif
+{
+	download_t *d = (download_t*)arg;
+	int c;
+	z_stream zs;
+
+	c = d->size - d->offset;
+
+	if (d->compbuf)
+	{
+		if (sv_compress_downloads->intvalue > Z_BEST_COMPRESSION)
+			Cvar_Set ("sv_compress_downloads", va("%d", Z_BEST_COMPRESSION));
+		memset(&zs, 0, sizeof(zs));
+		deflateInit2(&zs, sv_compress_downloads->intvalue, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
+		zs.next_out = d->compbuf;
+		zs.avail_out = c - 1;
+	}
+
+	do
+	{
+		char buf[0x4000];
+		int r = read(d->fd, buf, c < sizeof(buf) ? c : sizeof(buf));
+		if (r <= 0)
+			break;
+		c -= r;
+		if (d->compbuf)
+		{
+			if (!zs.next_in)
+			{
+				zs.next_in = buf;
+				zs.avail_in = 1024;
+				deflate(&zs, Z_PARTIAL_FLUSH);
+				zs.avail_in += r - 1024;
+			}
+			else
+			{
+				zs.next_in = buf;
+				zs.avail_in = r;
+			}
+			if ((r = deflate(&zs, 0)) || !zs.avail_out)
+			{
+				if (r)
+					Com_Printf ("Download compression error (%d)\n", LOG_SERVER|LOG_DOWNLOAD|LOG_WARNING, r);
+				break;
+			}
+		}
+	}
+	while (c > 0);
+	if (d->compbuf)
+	{
+		if (!c && deflate(&zs, Z_FINISH) == Z_STREAM_END)
+		{
+			d->compsize = zs.total_out;
+			d->compbuf = Z_Realloc(d->compbuf, d->compsize);
+			Com_Printf ("Compressed %s from %d to %d (%d%%)\n", LOG_SERVER|LOG_DOWNLOAD|LOG_NOTICE, d->name, d->size - d->offset, d->compsize, 100 * d->compsize / (d->size - d->offset));
+		}
+		else
+		{
+			Z_Free(d->compbuf);
+			d->compbuf = NULL;
+		}
+		deflateEnd(&zs);
+	}
+	close(d->fd);
+	d->fd = -1;
+	return 0;
+}
+
+download_t *NewCachedDownload(client_t *cl, qboolean compress)
+{
+	struct stat	s;
+	download_t *d = downloads;
+	if (compress)
+		fstat(fileno(cl->download), &s);
+	while (d)
+	{
+		if (!strcmp(d->name, cl->downloadFileName))
+		{
+			if (compress)
+			{
+				if (d->compbuf && d->offset == cl->downloadoffset)
+				{
+					if (d->mtime == s.st_mtime)
+					{
+						d->refc++;
+						return d;
+					}
+					if (!d->refc)
+					{
+						d->refc = 1;
+						d->size = cl->downloadsize;
+						d->mtime = s.st_mtime;
+						d->compsize = 0;
+						d->compbuf = Z_Realloc(d->compbuf, d->size - d->offset);
+						d->fd = dup(fileno(cl->download));
+						d->thread = Sys_StartThread(CacheDownload, d, -1);
+						return d;
+					}
+				}
+			}
+			else if (d->offset <= cl->downloadoffset)
+			{
+				if (d->fd == -1)
+					return NULL;
+				d->refc++;
+				return d;
+			}
+		}
+		d = d->next;
+	}
+
+	d = Z_TagMalloc(sizeof(*d), TAGMALLOC_DOWNLOAD_CACHE);
+	memset(d, 0, sizeof(*d));
+	d->refc = 1;
+	d->size = cl->downloadsize;
+	d->offset = cl->downloadoffset;
+	if (compress)
+	{
+		d->mtime = s.st_mtime;
+		d->compbuf = Z_TagMalloc(d->size - d->offset, TAGMALLOC_DOWNLOAD_CACHE);
+		if (!d->compbuf)
+		{
+			Z_Free(d);
+			return NULL;
+		}
+	}
+	d->name = CopyString (cl->downloadFileName, TAGMALLOC_DOWNLOAD_CACHE);
+	d->fd = dup(fileno(cl->download));
+	d->thread = Sys_StartThread(CacheDownload, d, -1);
+	d->next = downloads;
+	downloads = d;
+	return d;
+}
+#endif
+
+void ReleaseCachedDownload(download_t *download)
+{
+	download_t *d = downloads, *p = NULL;
+	while (d)
+	{
+		if (d == download)
+		{
+			d->refc--;
+			if (!d->refc && d->compbuf && d->offset)
+			{
+				if (p)
+					p->next = d->next;
+				else
+					downloads = d->next;
+				Sys_WaitThread(d->thread);
+				Z_Free(d->compbuf);
+				Z_Free(d->name);
+				Z_Free(d);
+			}
+			return;
+		}
+		p = d;
+		d = d->next;
+	}
+}
+#endif
+
+
+
+
 /*
 ============================================================
 
@@ -47,6 +220,151 @@ void SV_BeginDemoserver (void)
 		Com_Error (ERR_DROP, "Couldn't open %s\n", name);
 }
 
+#if KINGPIN
+static void SV_BaselinesMessage (qboolean userCmd);
+
+/*
+================
+SV_CreateBaseline
+
+Entity baselines are used to compress the update messages
+to the clients -- only the fields that differ from the
+baseline will be transmitted
+================
+*/
+#if 0
+static void SV_CreateBaseline (client_t *cl)
+{
+	edict_t			*svent;
+	int				entnum;
+
+	memset (cl->lastlines, 0, sizeof(entity_state_t) * MAX_EDICTS);
+
+	for (entnum = 1; entnum < ge->num_edicts ; entnum++)
+	{
+		svent = EDICT_NUM(entnum);
+
+		if (!svent->inuse)
+			continue;
+
+#if KINGPIN
+		// MH: include props in baselines
+		if (!svent->s.num_parts)
+#endif
+		if (!svent->s.modelindex && !svent->s.sound && !svent->s.effects)
+			continue;
+
+		svent->s.number = entnum;
+
+		//
+		// take current state as baseline
+		//
+		//VectorCopy (svent->s.origin, svent->s.old_origin);
+		cl->lastlines[entnum] = svent->s;
+
+		// MH: don't bother including player positions/angles as they'll soon change
+		if (svent->client)
+		{
+			memset(&cl->lastlines[entnum].origin, 0, sizeof(cl->lastlines[entnum].origin));
+			memset(&cl->lastlines[entnum].angles, 0, sizeof(cl->lastlines[entnum].angles));
+#if KINGPIN
+			// directional lighting too
+			memset(&cl->lastlines[entnum].model_lighting, 0, sizeof(cl->lastlines[entnum].model_lighting));
+#endif
+		}
+		// MH: don't include frames/events either for the same reason
+		cl->lastlines[entnum].frame = cl->lastlines[entnum].event = 0;
+
+	VectorCopy(cl->lastlines[entnum].origin, cl->lastlines[entnum].old_origin);
+	}
+}
+
+
+static void SV_AddConfigstrings (void)
+{
+	int		start;
+	int		wrote;
+	int		len;
+
+	if (sv_client->state != cs_spawning)
+	{
+		//r1: dprintf to avoid console spam from idiot client
+		Com_Printf ("configstrings for %s not valid -- not spawning\n", sv_client->name);
+		return;
+	}
+
+	start = 0;
+	wrote = 0;
+
+	// write a packet full of data
+
+	{
+		while (start < MAX_CONFIGSTRINGS)
+		{
+#if KINGPIN
+			int cs = start;
+			// MH: send downloadables, possibly in place of images
+			if (cs >= CS_IMAGES && cs < CS_IMAGES + MAX_IMAGES && (sv.dlconfigstrings[cs - CS_IMAGES][0] || sv.dlconfigstrings[cs - CS_IMAGES - 1][0]))
+				cs += MAX_CONFIGSTRINGS - CS_IMAGES;
+			if (sv.configstrings[cs][0])
+#else
+			if (sv.configstrings[start][0])
+#endif
+			{
+#if KINGPIN
+				len = (int)strlen(sv.configstrings[cs]);
+#else
+				len = (int)strlen(sv.configstrings[start]);
+#endif
+
+				len = len > MAX_QPATH ? MAX_QPATH : len;
+				SZ_Clear (&sv_client->netchan.message); //hypov8 add: ??
+				//MSG_BeginWriting (svc_configstring);
+				MSG_WriteByte (&sv_client->netchan.message, svc_configstring);
+				MSG_WriteShort (&sv_client->netchan.message, start);
+#if KINGPIN
+				MSG_WriteString(&sv_client->netchan.message, sv.configstrings[cs]); //hypov8 add
+				//MSG_Write (sv.configstrings[cs], len);
+#else
+				MSG_Write (sv.configstrings[start], len);
+#endif
+				//MSG_Write ("\0", 1);
+				MSG_WriteString(&sv_client->netchan.message, "\0"); //hypov8 add
+
+				// MH: count full message length
+				wrote += MSG_GetLength();
+				SV_AddMessage (sv_client, true);
+
+				//we add in a stuffcmd every 500 bytes to ensure that old clients will transmit a
+				//netchan ack asap. uuuuuuugly...
+#if KINGPIN
+				if (/*sv_client->patched < 4 &&*/ wrote >= 1300) // MH: patched client doesn't need this
+#else
+				if (wrote >= 500)
+#endif
+				{
+					SZ_Clear (&sv_client->netchan.message); //hypov8 add: ??
+					//MSG_BeginWriting (svc_stufftext);
+					MSG_WriteByte (&sv_client->netchan.message, svc_stufftext);
+					
+					MSG_WriteString (&sv_client->netchan.message, "cmd \177n\n");
+					SV_AddMessage (sv_client, true);
+					//===todo:=====SZ_Write
+					//===todo:=====wrote = 0;
+				}
+			}
+			start++;
+		}
+	}
+
+	// send next command
+
+	SV_BaselinesMessage (false);
+}
+#endif
+
+#endif
+
 /*
 ================
 SV_New_f
@@ -65,7 +383,24 @@ void SV_New_f (void)
 
 	if (sv_client->state != cs_connected)
 	{
-		Com_Printf ("New not valid -- already spawned\n");
+	#if  0 //KINGPIN
+		if (sv_client->state == cs_spawning)
+		{
+			//client typed 'reconnect/new' while connecting.
+			SZ_Clear (&sv_client->netchan.message); //hypov8 add: ??
+			//MSG_BeginWriting (&sv_client->netchan.message,svc_stufftext);
+			MSG_WriteByte (&sv_client->netchan.message, svc_stufftext);
+			MSG_WriteString (&sv_client->netchan.message,"\ndisconnect\nreconnect\n");
+			SV_AddMessage (sv_client, true);
+			SV_DropClient (sv_client, true);
+			//SV_WriteReliableMessages (sv_client, sv_client->netchan.message.buffsize);
+		}
+		else
+	#endif	
+		{
+			//shouldn't be here!
+			Com_DPrintf ("WARNING: Illegal 'new' from %s, client state %d. This shouldn't happen...\n", sv_client->name, sv_client->state);
+		}
 		return;
 	}
 
@@ -76,15 +411,40 @@ void SV_New_f (void)
 		return;
 	}
 
+#if 0 //KINGPIN	
+	//r1: new client state now to prevent multiple new from causing high cpu / overflows.
+	sv_client->state = cs_spawning;
+
+	//r1: fix for old clients that don't respond to stufftext due to pending cmd buffer
+	SZ_Clear (&sv_client->netchan.message); //hypov8 add: ??
+	//MSG_BeginWriting (&sv_client->netchan.message,svc_stufftext);
+	MSG_WriteByte (&sv_client->netchan.message, svc_stufftext);
+	MSG_WriteString (&sv_client->netchan.message,"\n");
+	SV_AddMessage (sv_client, true);
+
+	//if (SV_UserInfoBanned (sv_client)) //hypov8 todo:?
+		//return;
+#endif		
 	//
 	// serverdata needs to go over for all types of servers
 	// to make sure the protocol is right, and to set the gamedir
 	//
+#if KINGPIN
+	// MH: send client-side "gamedir" value
+	gamedir = Cvar_VariableString ("clientdir");
+#else
 	gamedir = Cvar_VariableString ("gamedir");
+#endif
 
 	// send the serverdata
+	SZ_Clear (&sv_client->netchan.message); //hypov8 add: ??
+	//MSG_BeginWriting (svc_serverdata);
 	MSG_WriteByte (&sv_client->netchan.message, svc_serverdata);
+#if KINGPIN //hypov8 todo: server
+	MSG_WriteLong (&sv_client->netchan.message, OLD_PROTOCOL_VERSION);
+#else
 	MSG_WriteLong (&sv_client->netchan.message, PROTOCOL_VERSION);
+#endif
 	MSG_WriteLong (&sv_client->netchan.message, svs.spawncount);
 	MSG_WriteByte (&sv_client->netchan.message, sv.attractloop);
 	MSG_WriteString (&sv_client->netchan.message, gamedir);
@@ -97,6 +457,20 @@ void SV_New_f (void)
 
 	// send full levelname
 	MSG_WriteString (&sv_client->netchan.message, sv.configstrings[CS_NAME]);
+#if 0 //KINGPIN
+	SV_AddMessage (sv_client, true);
+
+	//r1: we have to send another \n in case serverdata caused game switch -> autoexec without \n
+	//this will still cause failure if the last line of autoexec exec's another config for example.
+	SZ_Clear (&sv_client->netchan.message); //hypov8 add: ??
+	//MSG_BeginWriting (svc_stufftext);
+	MSG_WriteByte (&sv_client->netchan.message, svc_stufftext);
+	MSG_WriteString (&sv_client->netchan.message, "\n");
+	SV_AddMessage (sv_client, true);
+	//===todo:=====NET_SendPacket
+	//SV_WriteClientdataToMessage(sv_client, &sv_client->netchan.message);
+	//===todo:=====MSG_WriteDeltaEntity
+#endif
 
 	//
 	// game server
@@ -108,13 +482,148 @@ void SV_New_f (void)
 		ent->s.number = playernum+1;
 		sv_client->edict = ent;
 		memset (&sv_client->lastcmd, 0, sizeof(sv_client->lastcmd));
-
+#if 0 //KINGPIN
+		//r1: per-client baselines
+		SV_CreateBaseline (sv_client);
+		SV_AddConfigstrings ();
+#else
 		// begin fetching configstrings
+		SZ_Clear (&sv_client->netchan.message); //hypov8 add: ??
 		MSG_WriteByte (&sv_client->netchan.message, svc_stufftext);
 		MSG_WriteString (&sv_client->netchan.message, va("cmd configstrings %i 0\n",svs.spawncount) );
+#endif
+	}
+#if 0 //KINGPIN
+	else if (sv.state == ss_pic || sv.state == ss_cinematic)
+	{
+		SZ_Clear (&sv_client->netchan.message); //hypov8 add: ??
+		//MSG_BeginWriting (svc_stufftext);
+		MSG_WriteByte (&sv_client->netchan.message, svc_stufftext);
+		MSG_WriteString (&sv_client->netchan.message, va("cmd begin %i\n", svs.spawncount));
+		SV_AddMessage (sv_client, true);
+	}
+#endif
+}
+
+#if 0 //KINGPIN
+
+/*
+==================
+SV_Baselines_f
+==================
+*/
+static void SV_BaselinesMessage (qboolean userCmd)
+{
+	int				startPos;
+	int				start;
+	int				wrote;
+
+	entity_state_t	*base;
+
+	Com_DPrintf ("Baselines() from %s\n", sv_client->name);
+
+	if (sv_client->state != cs_spawning)
+	{
+		Com_DPrintf ("%s: baselines not valid -- not spawning\n", sv_client->name);
+		return;
+	}
+	
+	// handle the case of a level changing while a client was connecting
+	if (userCmd)
+	{
+		if ( atoi(Cmd_Argv(1)) != svs.spawncount)
+		{
+			Com_Printf ("SV_Baselines_f from %s from a different level\n", sv_client->name);
+			SV_New_f ();
+			return;
+		}
+
+		startPos = atoi(Cmd_Argv(2));
+	}
+	else
+	{
+		startPos = 0;
 	}
 
+
+	/*//r1: huge security fix !! remote DoS by negative here. //hypov8 todo:
+	if (startPos < 0)
+	{
+		Com_Printf ("Illegal baseline offset from %s[%s], client dropped\n", LOG_SERVER|LOG_EXPLOIT, sv_client->name, NET_AdrToString (&sv_client->netchan.remote_address));
+		Blackhole (&sv_client->netchan.remote_address, true, sv_blackhole_mask->intvalue, BLACKHOLE_SILENT, "attempted DoS (negative baselines)");
+		SV_DropClient (sv_client, false);
+		return;
+	}*/
+
+	start = startPos;
+	wrote = 0;
+
+	// write a packet full of data
+	//r1: use new per-client baselines
+#if !defined(NO_ZLIB) && !KINGPIN
+	if (sv_client->protocol == PROTOCOL_ORIGINAL)
+#endif
+	{
+#if KINGPIN && 0 // not needed with parental lock check
+		if (sv_client->patched < 4)
+		{
+			// MH: stuffing one at the start and then every 1300 bytes (below)
+			MSG_BeginWriting (svc_stufftext);
+			MSG_WriteString ("cmd \177n\n");
+			SV_AddMessage (sv_client, true);
+		}
+#endif
+
+#if !defined(NO_ZLIB) && !KINGPIN
+plainLines:
+#endif
+		start = startPos;
+		while (start < MAX_EDICTS)
+		{
+			base = &sv_client->lastlines[start];
+			if (base->number)
+			{
+
+				SZ_Clear (&sv_client->netchan.message); //hypov8 add: ??
+				//MSG_BeginWriting (svc_spawnbaseline);
+				MSG_WriteByte (&sv_client->netchan.message, svc_spawnbaseline);
+				
+#if KINGPIN
+				MSG_WriteDeltaEntity (&null_entity_state, base, true, true, false, 100);
+				//SV_WriteDeltaEntity (&null_entity_state, base, true, true, false, 100);
+#else
+				SV_WriteDeltaEntity (&null_entity_state, base, true, true, sv_client->protocol, sv_client->protocol_version);
+#endif
+				wrote += MSG_GetLength();
+				SV_AddMessage (sv_client, true);
+
+				//we add in a stuffcmd every 500 bytes to ensure that old clients will transmit a
+				//netchan ack asap. uuuuuuugly...
+#if KINGPIN
+				if (/*sv_client->patched < 4 &&*/ wrote >= 1300) // MH: patched client doesn't need this
+#else
+				if (wrote >= 500)
+#endif
+				{
+					MSG_BeginWriting (svc_stufftext);
+					MSG_WriteString ("cmd \177n\n","");//===todo:=====
+					SV_AddMessage (sv_client, true);
+					wrote = 0;
+				}
+
+			}
+			start++;
+		}
+	}
+
+
+	// send next command
+	MSG_BeginWriting (svc_stufftext);
+	MSG_WriteString (va("precache %i\n", svs.spawncount),"");//===todo:=====
+	SV_AddMessage (sv_client, true);
 }
+
+#endif
 
 // Knightmare added
 /*
@@ -142,7 +651,7 @@ int SV_SetMaxBaselinesSize (void)
 	}
 
 	// use MAX_MSGLEN/2 for SP and local clients
-	if ( (sv_client->netchan.remote_address.type == NA_LOOPBACK) || (maxclients->value == 1) )
+	if ( (sv_client->netchan.remote_address.type == NA_LOOPBACK) || ((int)maxclients->value == 1) )
 		return MAX_MSGLEN/2;
 	else
 		return sv_baselines_maxlen->integer;
@@ -319,6 +828,10 @@ void SV_Begin_f (void)
 	// Knightmare- set default player speeds here, if
 	// the game DLL hasn't already set them
 #ifdef NEW_PLAYER_STATE_MEMBERS
+#if KINGPIN //hypov8 todo: SV_Begin_f
+	if (sv_player->client)
+#endif
+	{
 	if (!sv_player->client->ps.maxspeed)
 		sv_player->client->ps.maxspeed = DEFAULT_MAXSPEED;
 	if (!sv_player->client->ps.duckspeed)
@@ -329,6 +842,7 @@ void SV_Begin_f (void)
 		sv_player->client->ps.accel = DEFAULT_ACCELERATE;
 	if (!sv_player->client->ps.stopspeed)
 		sv_player->client->ps.stopspeed = DEFAULT_STOPSPEED;
+	}
 #endif
 	// end Knightmare
 
@@ -342,6 +856,7 @@ void SV_Begin_f (void)
 SV_NextDownload_f
 ==================
 */
+#if !KINGPIN
 void SV_NextDownload_f (void)
 {
 	int		r;
@@ -373,7 +888,220 @@ void SV_NextDownload_f (void)
 	FS_FreeFile (sv_client->download);
 	sv_client->download = NULL;
 }
+#endif
 
+#if KINGPIN
+// MH: send a download message to a client
+void PushDownload (client_t *cl, qboolean start)
+{
+	int		r;
+
+	if (start && cl->downloadcache)
+	{
+		if (cl->downloadcache->compbuf)
+		{
+			// starting a compressed download
+			cl->downloadsize = cl->downloadcache->compsize;
+			cl->downloadpos = cl->downloadcount = 0;
+		}
+		else
+		{
+			// starting a cached download
+			ReleaseCachedDownload(cl->downloadcache);
+			cl->downloadcache = NULL;
+			fseek(cl->download, cl->downloadstart + cl->downloadoffset, SEEK_SET);
+		}
+	}
+
+	r = cl->downloadsize - cl->downloadpos;
+	if (r < 0)
+		return;
+#if 0
+	if (cl->patched >= 4)
+	{
+		// svc_xdownload message for patched client
+		if (r > 1366)
+			r = 1366;
+
+		MSG_BeginWriting (svc_xdownload);
+		MSG_WriteShort (r);
+		MSG_WriteLong (cl->downloadid);
+		if (start)
+		{
+			MSG_WriteLong (-cl->downloadoffset >> 10);
+			MSG_WriteLong (cl->downloadsize);
+			MSG_WriteLong (cl->downloadcache ? cl->downloadcache->size : 0);
+		}
+		else if (cl->downloadcache)
+			MSG_WriteLong (cl->downloadpos / 1366);
+		else
+			MSG_WriteLong ((cl->downloadpos - cl->downloadoffset) / 1366);
+		if (cl->downloadcache)
+			MSG_Write (cl->downloadcache->compbuf + cl->downloadpos, r);
+		else 
+			FS_Read(SZ_GetSpace(MSG_GetRawMsg(), r), r, cl->download);
+	}
+	else
+#endif
+	{
+		// svc_pushdownload message
+		if (r > 1024)
+			r = 1024;
+
+		//MSG_BeginWriting (svc_pushdownload);
+		SZ_Clear (&sv_client->netchan.message);
+		MSG_WriteByte (&sv_client->netchan.message, svc_pushdownload/*svc_download*/); //add hypov8
+		MSG_WriteShort (&sv_client->netchan.message, r);
+		MSG_WriteLong (&sv_client->netchan.message, cl->downloadsize);
+		MSG_WriteLong (&sv_client->netchan.message, cl->downloadid);
+		MSG_WriteLong (&sv_client->netchan.message, cl->downloadpos >> 10);
+		FS_Read(SZ_GetSpace(&sv_client->netchan.message/*MSG_GetRawMsg()*/, r), r, cl->download);
+	}
+
+	cl->downloadpos += r;
+	if (cl->downloadcount < cl->downloadpos)
+		cl->downloadcount = cl->downloadpos;
+
+	// first and last blocks are sent in reliable messages
+	if (!start && cl->downloadcount != cl->downloadsize)
+	{
+		int msglen =&sv_client->netchan.message.cursize;
+		int packetdup = cl->netchan.packetdup;
+		// send reliable separately first if needed to avoid overflow
+		int send_reliable =
+			(
+				(	cl->netchan.incoming_acknowledged > cl->netchan.last_reliable_sequence &&
+					cl->netchan.incoming_reliable_acknowledged != cl->netchan.reliable_sequence &&
+					cl->netchan.reliable_length + msglen > MAX_MSGLEN - 8
+				)
+				||
+				(
+					!cl->netchan.reliable_length && cl->netchan.message.cursize + msglen > MAX_MSGLEN - 8
+				)
+			);
+		if (send_reliable)
+			Netchan_Transmit (&cl->netchan, 0, NULL);
+		cl->netchan.packetdup = 0; // disable duplicate packets (client will re-request lost blocks)
+		Netchan_Transmit (&cl->netchan, msglen, &sv_client->netchan.message/* MSG_GetData()*/);
+		cl->netchan.packetdup = packetdup;
+		//MSG_FreeData();
+		SZ_Clear (&cl->netchan.message); //hypov8 add: Netchan_Transmit
+	}
+	else
+	{
+		//SV_AddMessage(cl, true); //hypov8 todo: 
+	}
+
+	if (cl->downloadcount != cl->downloadsize)
+		return;
+
+	// free download stuff
+	SV_CloseDownload(cl);
+}
+
+// MH: handle a download chunk request
+void SV_NextPushDownload_f (void)
+{
+	int offset;
+	int n;
+
+	if (!sv_client->download || (sv_client->downloadcache && sv_client->downloadsize != sv_client->downloadcache->compsize))
+		return;
+
+	for (n=1;; n++)
+	{
+		if (!Cmd_Argv(n)[0])
+			break;
+
+		// check that the client has tokens available if bandwidth is limited
+		///if (sv_bandwidth->intvalue > 0) //hypov8 todo:
+		{
+			if (sv_client->downloadtokens < 1)
+				return;
+			sv_client->downloadtokens -= (/*sv_client->patched >= 4 ? 1.333f :*/ 1);
+		}
+#if 0
+		if (sv_client->patched >= 4)
+		{
+			offset = atoi(Cmd_Argv(n)) * 1366;
+			if (!sv_client->downloadcache)
+				offset += sv_client->downloadoffset;
+		}
+		else
+#endif
+			offset = atoi(Cmd_Argv(n)) << 10;
+		if (offset < 0 || offset >= sv_client->downloadsize)
+			return;
+
+		if (sv_client->downloadpos != offset)
+		{
+			// seek to requested position
+			sv_client->downloadpos = offset;
+			if (!sv_client->downloadcache)
+				fseek(sv_client->download, sv_client->downloadstart + sv_client->downloadpos, SEEK_SET);
+		}
+
+		PushDownload(sv_client, false);
+
+		// patched clients can request multiple chunks at a time
+		if (/*sv_client->patched < 4 ||*/ !sv_client->download)
+			break;
+	}
+}
+
+// MH: calculate per-client download speed limit
+int GetDownloadRate()
+{
+	int dlrate;
+#if 0 //hypov8 todo: sv_bandwidth
+	if (sv_bandwidth->intvalue)
+	{
+		int j, c = 0, cp = 0;
+		int bw = sv_bandwidth->intvalue;
+		for (j=0 ; j<maxclients->intvalue ; j++)
+		{
+			if (svs.clients[j].state <= cs_zombie)
+				continue;
+			if (svs.clients[j].download)
+			{
+				c++;
+				if (svs.clients[j].patched)
+					cp++;
+			}
+			else
+				bw -= (svs.clients[j].rate > 14000 ? 14000 : svs.clients[j].rate) / 1000;
+		}
+		dlrate = bw / (c ? c : 1);
+		if (dlrate > 200 && cp)
+		{
+			dlrate = (bw - (c - cp) * 200) / cp;
+			if (dlrate > 1000) // no higher than 1MB/s
+				dlrate = 1000;
+		}
+		else if (dlrate < 30) // no lower than 30KB/s
+			dlrate = 30;
+	}
+	else
+#endif
+		dlrate = 1000; // default to 1MB/s
+	return dlrate;
+}
+
+// MH: check if a file is in the downloadables list
+static qboolean IsDownloadable(const char *file)
+{
+	int i;
+
+	for (i=0; i<MAX_IMAGES; i++)
+	{
+		if (!sv.dlconfigstrings[i][0])
+			break;
+		if (!Q_stricmp(file, sv.dlconfigstrings[i]))
+			return true;
+	}
+	return false;
+}
+#endif
 /*
 ==================
 SV_BeginDownload_f
@@ -502,9 +1230,36 @@ void SV_BeginDownload_f(void)
 		MSG_WriteByte (&sv_client->netchan.message, 0);
 		return;
 	}
+#if KINGPIN //hypov8 todo: SV_NextDownload_f
 
+#else
 	SV_NextDownload_f ();
+#endif
 	Com_DPrintf ("Downloading %s to %s\n", name, sv_client->name);
+}
+
+
+
+// MH: free download stuff
+void SV_CloseDownload(client_t *cl)
+{
+	if (!cl->download)
+		return;
+
+	fclose (cl->download);
+	cl->download = NULL;
+	cl->downloadsize = 0;
+
+	Z_Free (cl->downloadFileName);
+	cl->downloadFileName = NULL;
+
+#if KINGPIN
+	if (cl->downloadcache)
+	{
+		ReleaseCachedDownload(cl->downloadcache);
+		cl->downloadcache = NULL;
+	}
+#endif
 }
 
 
@@ -635,7 +1390,16 @@ ucmd_t ucmds[] =
 	{"info", SV_ShowServerinfo_f},
 
 	{"download", SV_BeginDownload_f},
+#if KINGPIN
+	{"download5", SV_BeginDownload_f},
+	{"nextdl2", SV_NextPushDownload_f},
+#else
 	{"nextdl", SV_NextDownload_f},
+#endif
+
+#if !KINGPIN //hypov8 todo: SV_PutAway_f
+	{"putaway", SV_PutAway_f},
+#endif
 
 	{NULL, NULL}
 };
@@ -766,9 +1530,11 @@ void SV_ExecuteClientMessage (client_t *cl)
 			checksumIndex = net_message.readcount;
 			checksum = MSG_ReadByte (&net_message);
 			lastframe = MSG_ReadLong (&net_message);
-			if (lastframe != cl->lastframe) {
+			if (lastframe != cl->lastframe) 
+			{
 				cl->lastframe = lastframe;
-				if (cl->lastframe > 0) {
+				if (cl->lastframe > 0) 
+				{
 					cl->frame_latency[cl->lastframe&(LATENCY_COUNTS-1)] = 
 						svs.realtime - cl->frames[cl->lastframe & UPDATE_MASK].senttime;
 				}
@@ -786,6 +1552,21 @@ void SV_ExecuteClientMessage (client_t *cl)
 			}
 
 			// if the checksum fails, ignore the rest of the packet
+#if KINGPIN
+			calculatedChecksum = COM_BlockSequenceCheckByte (
+				net_message_buffer + checksumIndex + 1,
+				net_message.readcount - checksumIndex - 1,
+				cl->netchan.incoming_sequence,
+				cl->challenge);
+
+			if (calculatedChecksum != checksum)
+			{
+				Com_DPrintf ("Failed command checksum for %s (%d != %d)/%d\n", 
+					cl->name, calculatedChecksum, checksum, 
+					cl->netchan.incoming_sequence);
+				return;
+			}
+#else
 			calculatedChecksum = COM_BlockSequenceCRCByte (
 				net_message.data + checksumIndex + 1,
 				net_message.readcount - checksumIndex - 1,
@@ -798,6 +1579,7 @@ void SV_ExecuteClientMessage (client_t *cl)
 					cl->netchan.incoming_sequence);
 				return;
 			}
+#endif
 
 			if (!sv_paused->value)
 			{

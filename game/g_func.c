@@ -901,7 +901,7 @@ void Use_Plat (edict_t *ent, edict_t *other, edict_t *activator)
 }
 
 
-void Touch_Plat_Center (edict_t *ent, edict_t *other, cplane_t *plane, csurface_t *surf)
+void Touch_Plat_Center (edict_t *ent, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if (!other->client)
 		return;
@@ -1138,7 +1138,7 @@ void rotating_blocked (edict_t *self, edict_t *other)
 	T_Damage (other, self, self, vec3_origin, other->s.origin, vec3_origin, self->dmg, 1, 0, MOD_CRUSH);
 }
 
-void rotating_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void rotating_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if (self->avelocity[0] || self->avelocity[1] || self->avelocity[2])
 		T_Damage (other, self, self, vec3_origin, other->s.origin, vec3_origin, self->dmg, 1, 0, MOD_CRUSH);
@@ -1341,7 +1341,7 @@ void button_use (edict_t *self, edict_t *other, edict_t *activator)
 	button_fire (self);
 }
 
-void button_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void button_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	// Lazarus: allow robot actors to touch buttons
 	if (!other->client && !(other->flags & FL_ROBOT))
@@ -1492,7 +1492,7 @@ void trainbutton_use (edict_t *self, edict_t *other, edict_t *activator)
 	trainbutton_fire (self);
 }
 
-void trainbutton_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void trainbutton_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if (!other->client)
 		return;
@@ -1800,7 +1800,7 @@ void door_use (edict_t *self, edict_t *other, edict_t *activator)
 	}
 };
 
-void Touch_DoorTrigger (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void Touch_DoorTrigger (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if (other->health <= 0)
 		return;
@@ -1975,7 +1975,7 @@ void door_killed (edict_t *self, edict_t *inflictor, edict_t *attacker, int dama
 	door_use (self->teammaster, attacker, attacker);
 }
 
-void door_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void door_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	// Lazarus: Allows robot usage
 	if (!other->client && !(other->flags & FL_ROBOT))
@@ -3878,7 +3878,7 @@ void box_water_friction(edict_t *ent)
 }
 
 edict_t *CrateOnTop (edict_t *from, edict_t *ent);
-void box_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void box_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	float	e;   // coefficient of restitution
 	float   m;
@@ -4353,7 +4353,7 @@ void pivot_stop(edict_t *ent)
 	gi.linkentity(ent);
 }
 
-void pivot_touch(edict_t *ent, edict_t *other, cplane_t *plane, csurface_t *surf)
+void pivot_touch(edict_t *ent, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	float	time;
 	vec3_t	offset;
@@ -4495,19 +4495,21 @@ void force_wall_think(edict_t *self)
 {
 	if(!self->wait)
 	{
+		#if !KINGPIN //hypov8 todo: dll
 		gi.WriteByte (svc_temp_entity);
 		gi.WriteByte (TE_FORCEWALL);
 		gi.WritePosition (self->pos1);
 		gi.WritePosition (self->pos2);
 		gi.WriteByte  (self->style);
 		gi.multicast (self->offset, MULTICAST_PVS);
+#endif
 	}
 
 	self->think = force_wall_think;
 	self->nextthink = level.time + FRAMETIME;
 }
 
-void func_force_wall_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void func_force_wall_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if (!other->takedamage)
 		return;

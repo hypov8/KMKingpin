@@ -34,6 +34,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "client.h"
 #include "../ui/ui_local.h"
 
+
 float		scr_con_current;	// aproaches scr_conlines at scr_conspeed
 float		scr_conlines;		// 0.0 to 1.0 lines of console to display
 
@@ -47,8 +48,9 @@ qboolean	scr_initialized;		// ready to draw
 int			scr_draw_loading;
 
 vrect_t		scr_vrect;		// position of render window on screen
-
-
+#if KINGPIN
+cvar_t		*scr_chattime;
+#endif
 cvar_t		*scr_viewsize;
 cvar_t		*scr_conspeed;
 cvar_t		*scr_letterbox;
@@ -91,12 +93,19 @@ int			crosshair_width, crosshair_height;
 void SCR_TimeRefresh_f (void);
 void SCR_Loading_f (void);
 
+#if !KINGPIN
 #define LOADSCREEN_NAME "/gfx/ui/unknownmap.pcx"
-
 #define	ICON_WIDTH	24
 #define	ICON_HEIGHT	24
 #define	CHAR_WIDTH	16
 #define	ICON_SPACE	8
+#else
+//#define LOADSCREEN_NAME "/pics/conback.tga"
+#define	ICON_WIDTH	16
+#define	ICON_HEIGHT	16
+#define	CHAR_WIDTH	10
+#define	ICON_SPACE	18
+#endif
 
 /*
 ===============================================================================
@@ -336,6 +345,138 @@ void SCR_DrawChar (float x, float y, scralign_t align, int num, int red, int gre
 	R_DrawChar(x, y, num, screenScale.avg, red, green, blue, alpha, italic, last);
 }
 
+
+#if KINGPIN
+#define HUD_FONT_SIZE_NORM 8.0f
+#define HUD_FONT_SIZE_LARG 10.0f
+#define HUD_FONT_SCALE (screenScale.avg* ( (1/HUD_FONT_SIZE_NORM) * HUD_FONT_SIZE_LARG)) 
+/*
+================
+SCR_DrawCharString
+//hypov8 add colors char string
+Coordinates are 640*480 virtual values
+=================
+*/
+void SCR_DrawCharString (char *string, float x, float y, float scale, scralign_t align, int red, int green, int blue, int alpha, qboolean italic)
+{
+	int i;
+	int chr;
+	qboolean last=false;
+	float x_;
+	//SCR_AdjustFrom640 (&x, &y, NULL, NULL, align);
+	x_ = x;
+
+	for (i=0; i<1024; i++)
+	{
+		if (string[i])
+			chr = (int)string[i];
+		if (string[i + 1] == '\0')
+			last = true;
+
+		if (string[i] != ' '&& string[i] != '\r') //hypov8 todo: null chars, tab??
+			R_DrawChar(x_, y, chr, scale/** HUD_FONT_SCALE*/, red, green, blue, alpha, italic, last);
+
+		x_ += HUD_FONT_SIZE_LARG; // HUD_FONT_SIZE_LARG/* * screenScale.x*/; //hypov8 todo: char len?
+		if (last)
+			break;
+	}
+}
+
+void Hud_DrawStringRGB (int x, int y, const char *string, int alpha, qboolean isStatusBar, int R, int G, int B)
+{
+	DrawStringGeneric (x, y, string, alpha, (isStatusBar) ? SCALETYPE_HUD : SCALETYPE_MENU, false, R, G, B);
+}
+
+void Hud_DrawStringRGBFixed (int x, int y, const char *string, int alpha, qboolean isStatusBar, int R, int G, int B)
+{
+	DrawStringGeneric (x, y, string, alpha, SCALETYPE_MENU, false, R, G, B);
+}
+
+void Hud_DrawStringRGBScore (int x, int y, const char *string, int alpha, qboolean isStatusBar, int R, int G, int B)
+{
+	DrawStringGeneric (x, y, string, alpha, SCALETYPE_SCORE, false, R, G, B);
+}
+
+
+//add hypov8
+void SCR_DrawField(int x, int y, int color, int width, int value, qboolean flash, qboolean isStatusBar, float scale);
+void SCR_DrawArmor(float scale, qboolean isStatusBar)
+{
+	int value;
+	int trueVal;
+
+	//default
+	R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value,	"/pics/armor.tga");
+
+	// armor head
+	value = cl.frame.playerstate.stats[STAT_ARMOR1];
+	if (value >= 1024)	trueVal = value - 1024;
+	else	trueVal = value;
+	if (value > 0)
+	{	//heavy/light icon
+		if (value >= 1024)
+			R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value,	"/pics/armor_hv_h.tga");
+		else
+			R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value,	"/pics/armor_lt_h.tga");
+
+		//outline colors
+		if (trueVal>74)
+			R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value, "/pics/armor_hg.tga");
+		else if (trueVal>48)
+			R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value, "/pics/armor_hy.tga");
+		else
+			R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value, "/pics/armor_hr.tga");
+	}
+	//value head
+	SCR_DrawField (-10*scale, viddef.height-(55*scale), 0, 3, trueVal , false, isStatusBar, 0.5);
+
+	// armor body
+	value = cl.frame.playerstate.stats[STAT_ARMOR2];
+	if (value >= 1024)	trueVal = value - 1024;
+	else	trueVal = value;
+	if (value > 0)
+	{	//heavy/light icon
+		if (value >= 1024)
+			R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value,	"/pics/armor_hv_b.tga");
+		else
+			R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value,	"/pics/armor_lt_b.tga");
+		//outline colors
+		if (trueVal>74)
+			R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value, "/pics/armor_bg.tga");
+		else if (trueVal>48)
+			R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value, "/pics/armor_by.tga");
+		else
+			R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value, "/pics/armor_br.tga");
+	}
+	//value body
+	SCR_DrawField (-10*scale, viddef.height-(40*scale), 0, 3, trueVal , false, isStatusBar, 0.5);
+
+
+	// armor head
+	value = cl.frame.playerstate.stats[STAT_ARMOR3];
+	if (value >= 1024)	trueVal = value - 1024;
+	else	trueVal = value;
+	if (value > 0)
+	{	//heavy/light icon
+		if (value >= 1024)
+			R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value,	"/pics/armor_hv_l.tga");
+		else
+			R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value,	"/pics/armor_lt_l.tga");
+		//outline colors
+		if (trueVal>74)
+			R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value, "/pics/armor_lg.tga");
+		else if (trueVal>48)
+			R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value, "/pics/armor_ly.tga");
+		else
+			R_DrawScaledPic (20*scale, viddef.height-(70*scale), .75 *scale, hud_alpha->value, "/pics/armor_lr.tga");
+	}
+	//value legs
+	SCR_DrawField (-10*scale, viddef.height-(25*scale), 0, 3, trueVal , false, isStatusBar, 0.5);
+
+
+}
+#endif
+
 /*
 ================
 SCR_DrawString
@@ -345,7 +486,7 @@ Coordinates are 640*480 virtual values
 void SCR_DrawString (float x, float y, scralign_t align, const char *string, int alpha)
 {
 	SCR_AdjustFrom640 (&x, &y, NULL, NULL, align);
-	DrawStringGeneric (x, y, string, alpha, SCALETYPE_MENU, false);
+	DrawStringGeneric (x, y, string, alpha, SCALETYPE_MENU, false, -1, -1, -1);
 }
 
 //===============================================================================
@@ -358,9 +499,14 @@ Hud_DrawString
 */
 void Hud_DrawString (int x, int y, const char *string, int alpha, qboolean isStatusBar)
 {
-	DrawStringGeneric (x, y, string, alpha, (isStatusBar) ? SCALETYPE_HUD : SCALETYPE_MENU, false);
+	DrawStringGeneric (x, y, string, alpha, (isStatusBar) ? SCALETYPE_HUD : SCALETYPE_MENU, false, -1, -1, -1);
 }
 
+//hypov8 use fixed hud text size?
+void Hud_DrawString_fixed (int x, int y, const char *string, int alpha, qboolean isStatusBar)
+{
+	DrawStringGeneric (x, y, string, alpha, SCALETYPE_MENU, false, -1, -1, -1);
+}
 
 /*
 ================
@@ -369,9 +515,8 @@ Hud_DrawStringAlt
 */
 void Hud_DrawStringAlt (int x, int y, const char *string, int alpha, qboolean isStatusBar)
 {
-	DrawStringGeneric (x, y, string, alpha, (isStatusBar) ? SCALETYPE_HUD : SCALETYPE_MENU, true);
+	DrawStringGeneric (x, y, string, alpha, (isStatusBar) ? SCALETYPE_HUD : SCALETYPE_MENU, true, -1, -1, -1);
 }
-
 
 /*
 ================
@@ -421,8 +566,8 @@ static void SCR_ShowFPS (void)
 	fragsSize = HudScale() * 3 * (CHAR_WIDTH+2);
 	x = ( viddef.width - strlen(fpsText)*HUD_FONT_SIZE*SCR_VideoScale() - max(fragsSize, SCR_ScaledVideo(68)) );
 	y = 0;
-//	DrawStringGeneric (x, y, fpsText, 255, SCALETYPE_HUD, false); // SCALETYPE_CONSOLE
-	DrawStringGeneric (x, y, fpsText, 255, SCALETYPE_MENU, false); // SCALETYPE_HUD
+//	DrawStringGeneric (x, y, fpsText, 255, SCALETYPE_HUD, false, -1, -1, -1); // SCALETYPE_CONSOLE
+	DrawStringGeneric (x, y, fpsText, 255, SCALETYPE_MENU, false, -1, -1, -1); // SCALETYPE_HUD
 }
 
 /*
@@ -552,8 +697,8 @@ void SCR_DrawDebugGraph (void)
 		ping = currentping;
 	}
 
-	DrawStringGeneric (x, y + 5, va(S_COLOR_SHADOW"fps: %3i", fps), 255, SCALETYPE_CONSOLE, false);
-	DrawStringGeneric (x, y + 5 + FONT_SIZE , va(S_COLOR_SHADOW"ping:%3i", ping), 255, SCALETYPE_CONSOLE, false);
+	DrawStringGeneric (x, y + 5, va(S_COLOR_SHADOW"fps: %3i", fps), 255, SCALETYPE_CONSOLE, false, -1, -1, -1);
+	DrawStringGeneric (x, y + 5 + FONT_SIZE , va(S_COLOR_SHADOW"ping:%3i", ping), 255, SCALETYPE_CONSOLE, false, -1, -1, -1);
 
 	// draw border
 	R_DrawFill (x,			y,			(w+2),	1,		0, 0, 0, 255);
@@ -677,7 +822,7 @@ void SCR_DrawCenterString (void)
 			if (!remaining--)
 				return;
 		}
-		DrawStringGeneric ( (int)((viddef.width-strlen(line)*FONT_SIZE)*0.5), y, line, alpha, SCALETYPE_CONSOLE, false);
+		DrawStringGeneric ( (int)((viddef.width-strlen(line)*FONT_SIZE)*0.5), y, line, alpha, SCALETYPE_CONSOLE, false, -1, -1, -1);
 		y += FONT_SIZE;
 
 		while (*start && *start != '\n')
@@ -700,6 +845,123 @@ void SCR_CheckDrawCenterString (void)
 }
 
 //=============================================================================
+
+
+#if KINGPIN
+/*
+===============================================================================
+CHAT PRINTING
+===============================================================================
+*/
+
+#define CHAT_LINES 8
+typedef struct scr_chat_s
+{
+	char str[1024];
+	int time;
+} scr_chat_t;
+
+scr_chat_t scr_chatstring[CHAT_LINES];
+float		scr_chattime_off;
+
+/*
+==============
+SCR_ChatPrint
+
+Called for chat messages that should stay in bottom left of screen
+for a few moments
+==============
+*/
+void SCR_ChatPrint (char *str)
+{
+	char	*s;
+	char	line[64];
+	int		i, j, l;
+	int start;
+	int cTime;
+
+	//char recieved, reset timmer
+	scr_chattime_off = scr_chattime->value;
+
+	//move previous chats to next slot
+	for (i = 0; i < CHAT_LINES-1; i++)	{
+		memcpy(&scr_chatstring[i], &scr_chatstring[i+1], sizeof(scr_chatstring[i]));
+	}
+
+	//copy latest chat mesage
+	strncpy (scr_chatstring[CHAT_LINES-1].str, str, sizeof(scr_chatstring[CHAT_LINES-1].str)-1);
+	scr_chatstring[CHAT_LINES-1].time = cls.realtime /*cl.time*/;
+	
+	//Con_ClearNotify (); //hypov8 ok off?
+}
+
+//hypov8 new chat
+void SCR_DrawChatString (void)
+{
+	char	*start, line[512];
+	int		l, j, k;
+	int		y; //, x;
+	int		remaining;
+	// added Psychospaz's fading chatstrings
+	//int		alpha = 255 * ( 1 - (((cl.time + (scr_chattime->value-1) - scr_chattime_start) / 1000.0) / (scr_chattime_end)));
+	int		alpha = 255;
+
+	y = 380; //hypov8 todo: scale wit hud
+
+	//loop through all 8 chat lines
+	for (k = 0; k < 8; k++)
+	{
+		int len;
+		int cTime = (scr_chatstring[k].time>0)? scr_chatstring[k].time + (scr_chattime->value * 1000) : 0;
+		start = scr_chatstring[k].str;
+		if (cTime < cls.realtime /*cl.time*/)
+			continue;
+
+		//alpha = cls.realtime /*cl.time*/ - scr_chatstring[k].time;
+		alpha = 255 * ( 1 - (((cls.realtime /*cl.time*/ + (scr_chattime->value-1) - scr_chatstring[k].time) / 1000.0) / (scr_chattime->value)));
+
+		len = strlen(start);
+		if (len > 512)
+			len = 512;
+
+		l = 0;
+		do
+		{
+			Com_sprintf(line, sizeof(line), "");
+			for (j = 0; j < 40 /*l*/; j++, l++)
+			{
+				if (start[l] == '\n' || start[l] == '\0') {
+					l++;
+					break;
+				}
+				Com_sprintf(line, sizeof(line), "%s%c", line, start[l]);
+			}
+			if (strlen(line))
+			{
+				int xoff = 20;
+				if (l > 40)
+					xoff = 80;
+
+				DrawStringGeneric( xoff/*(int)((viddef.width - strlen(line)*FONT_SIZE)*0.5)*/, y, line, alpha, SCALETYPE_CONSOLE, false, -1, -1, -1);
+				y += FONT_SIZE;
+			}
+		} while (l <len);
+	}
+}
+
+void SCR_CheckDrawChatString (void)
+{
+	scr_chattime_off -= cls.renderFrameTime;
+	
+	if (scr_chattime_off <= 0)
+		return;
+
+	SCR_DrawChatString ();
+}
+
+//=============================================================================
+#endif //hypov8 end chat txt
+
 
 /*
 =================
@@ -827,6 +1089,9 @@ void SCR_Init (void)
 	scr_letterbox = Cvar_Get ("scr_letterbox", "1", CVAR_ARCHIVE);
 	scr_showturtle = Cvar_Get ("scr_showturtle", "0", 0);
 	scr_showpause = Cvar_Get ("scr_showpause", "1", 0);
+#if KINGPIN
+	scr_chattime = Cvar_Get ("scr_chattime", "15", 0);
+#endif
 	// Knightmare- increased for fade
 	scr_centertime = Cvar_Get ("scr_centertime", "3.5", 0);
 	scr_printspeed = Cvar_Get ("scr_printspeed", "8", 0);
@@ -1100,6 +1365,7 @@ void SCR_DrawLoading (void)
 			haveMapPic = true;
 		}
 		// else try levelshot
+#if ! KINGPIN
 		else if (/*widescreen &&*/ R_DrawFindPic(va("/levelshots/%s_widescreen.pcx", mapfile))) {
 			// Draw at 16:10 aspect, don't stretch to 16:9 or wider
 			SCR_DrawFill (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ALIGN_STRETCH, 0, 0, 0, 255);
@@ -1116,6 +1382,24 @@ void SCR_DrawLoading (void)
 			SCR_DrawPic (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ALIGN_CENTER, va("/levelshots/%s.pcx", mapfile), 1.0); // was ALIGN_STRETCH
 			haveMapPic = true;
 		}
+#else
+		else if (/*widescreen &&*/ R_DrawFindPic(va("/%s/%s_widescreen.pcx", UI_MAP_SCRN_DIR, mapfile))) {
+			// Draw at 16:10 aspect, don't stretch to 16:9 or wider
+			SCR_DrawFill (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ALIGN_STRETCH, 0, 0, 0, 255);
+		//	SCR_DrawPic (-64, 0, SCREEN_WIDTH+128, SCREEN_HEIGHT, ALIGN_CENTER, va("/%s/%s_widescreen.pcx", UI_MAP_SCRN_DIR, mapfile), 1.0);
+			// Draw at native aspect
+			Com_sprintf(picName, sizeof(picName), "/%s/%s_widescreen.pcx", UI_MAP_SCRN_DIR, mapfile);
+			SCR_GetPicPosWidth (picName, &picX, &picW);
+			SCR_DrawPic (picX, 0, picW, SCREEN_HEIGHT, ALIGN_CENTER, picName, 1.0);
+			haveMapPic = true;
+		}
+		else if (R_DrawFindPic(va("/%s/%s.pcx", UI_MAP_SCRN_DIR, mapfile))) {
+			// Draw at 4:3 aspect, don't stretch to 16:9 or wider
+			SCR_DrawFill (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ALIGN_STRETCH, 0, 0, 0, 255);
+			SCR_DrawPic (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ALIGN_CENTER, va("/%s/%s.pcx", UI_MAP_SCRN_DIR, mapfile), 1.0); // was ALIGN_STRETCH
+			haveMapPic = true;
+		}
+#endif
 		// else fall back on loadscreen
 		else if (R_DrawFindPic(LOADSCREEN_NAME)) {
 			SCR_DrawFill (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ALIGN_STRETCH, 0, 0, 0, 255);
@@ -1566,6 +1850,7 @@ HUD CODE
 */
 
 #define STAT_MINUS		10	// num frame for '-' stats digit
+#if !KINGPIN
 char		*sb_nums[2][11] = 
 {
 	{"num_0", "num_1", "num_2", "num_3", "num_4", "num_5",
@@ -1573,6 +1858,21 @@ char		*sb_nums[2][11] =
 	{"anum_0", "anum_1", "anum_2", "anum_3", "anum_4", "anum_5",
 	"anum_6", "anum_7", "anum_8", "anum_9", "anum_minus"}
 };
+#else
+char		*sb_nums[6][11] = 
+{
+	{"hud_0", "hud_1", "hud_2", "hud_3", "hud_4", "hud_5", "hud_6", "hud_7", "hud_8", "hud_9", "hud_-"}, //#0
+	{"ghud_0", "ghud_1", "ghud_2", "ghud_3", "ghud_4", "ghud_5", "ghud_6", "ghud_7", "ghud_8", "ghud_9", "ghud_-"}, //#1 //green
+	{"ohud_0", "ohud_1", "ohud_2", "ohud_3", "ohud_4", "ohud_5", "ohud_6", "ohud_7", "ohud_8", "ohud_9", "ohud_-"}, //#2 //orange
+	{"rhud_0", "rhud_1", "rhud_2", "rhud_3", "rhud_4", "rhud_5", "rhud_6", "rhud_7", "rhud_8", "rhud_9", "rhud_-"}, //#3 //red
+	{"rrhud_0", "rrhud_1", "rrhud_2", "rrhud_3", "rrhud_4", "rrhud_5", "rrhud_6", "rrhud_7", "rrhud_8", "rrhud_9", "rrhud_-"},//#4 //red thick
+	{"yhud_0", "yhud_1", "yhud_2", "yhud_3", "yhud_4", "yhud_5", "yhud_6", "yhud_7", "yhud_8", "yhud_9", "yhud_-"}, //#5 //yellow
+
+
+};
+
+#endif
+
 
 // Knghtmare- scaled HUD support functions
 float scaledHud (float param)
@@ -1742,7 +2042,7 @@ void _DrawHUDString (char *string, int x, int y, int centerwidth, int xor, qbool
 SCR_DrawField
 ==============
 */
-void SCR_DrawField (int x, int y, int color, int width, int value, qboolean flash, qboolean isStatusBar)
+void SCR_DrawField (int x, int y, int color, int width, int value, qboolean flash, qboolean isStatusBar, float scale)
 {
 	char		num[16], *ptr;
 	int			l, frame;
@@ -1780,17 +2080,21 @@ void SCR_DrawField (int x, int y, int color, int width, int value, qboolean flas
 		else
 			l = width;
 	}
+#if KINGPIN //allow tiny numbers for armour
+	digitWidth = scale* fieldScale*(float)CHAR_WIDTH;
+#else
 	digitWidth = fieldScale*(float)CHAR_WIDTH;
+#endif
 	digitOffset = width*scaleForScreen(CHAR_WIDTH) - l*digitWidth;
 //	x += 2 + scaledHud(CHAR_WIDTH)*(width - l);
 //	x += 2 + scaleForScreen(CHAR_WIDTH)*(width - l);
 	x += 2 + digitOffset;
 	flashWidth = l*digitWidth;
 	flash_x = x;
-
+#if !KINGPIN //hypov8 todo: field_3
 	if (flash)
-		R_DrawStretchPic (flash_x, y, flashWidth, scaleForScreen(ICON_HEIGHT), "field_3", hud_alpha->value);
-
+		R_DrawStretchPic (flash_x, y, flashWidth, scale*scaleForScreen(ICON_HEIGHT), "field_3", hud_alpha->value);
+#endif
 	ptr = num;
 	while (*ptr && l)
 	{
@@ -1803,7 +2107,7 @@ void SCR_DrawField (int x, int y, int color, int width, int value, qboolean flas
 //		x += scaledHud(CHAR_WIDTH);
 //		R_DrawScaledPic (x, y, getScreenScale(), hud_alpha->value, sb_nums[color][frame]);
 //		x += scaleForScreen(CHAR_WIDTH);
-		R_DrawStretchPic (x, y, digitWidth, scaleForScreen(ICON_HEIGHT), sb_nums[color][frame], hud_alpha->value);
+		R_DrawStretchPic (x, y, digitWidth, scale*scaleForScreen(ICON_HEIGHT), sb_nums[color][frame], hud_alpha->value);
 		x += digitWidth;
 		ptr++;
 		l--;
@@ -1821,8 +2125,11 @@ Allows rendering code to cache all needed sbar graphics
 void SCR_TouchPics (void)
 {
 	int		i, j;
-
+#if !KINGPIN //crosshair_pic
 	for (i=0 ; i<2 ; i++)
+#else
+	for (i=0 ; i<6 ; i++)
+#endif
 		for (j=0 ; j<11 ; j++)
 			R_DrawFindPic (sb_nums[i][j]);
 
@@ -1830,7 +2137,6 @@ void SCR_TouchPics (void)
 	{
 		if (crosshair->value > 100 || crosshair->value < 0) //Knightmare increased
 			crosshair->value = 1;
-
 		Com_sprintf (crosshair_pic, sizeof(crosshair_pic), "ch%i", (int)(crosshair->value));
 		R_DrawGetPicSize (&crosshair_width, &crosshair_height, crosshair_pic);
 		if (!crosshair_width)
@@ -1847,6 +2153,7 @@ SCR_ExecuteLayoutString
 void SCR_ExecuteLayoutString (char *s, qboolean isStatusBar)
 {
 	int		x, y;
+
 	int		value;
 	char	*token;
 	char	string[1024];
@@ -1855,6 +2162,9 @@ void SCR_ExecuteLayoutString (char *s, qboolean isStatusBar)
 	clientinfo_t	*ci;
 	float			(*scaleForScreen)(float in);
 	float			(*getScreenScale)(void);
+#if KINGPIN
+	int x_640, y_640;
+#endif
 
 	if (cls.state != ca_active || !cl.refresh_prepped)
 		return;
@@ -1884,43 +2194,211 @@ void SCR_ExecuteLayoutString (char *s, qboolean isStatusBar)
 		{
 			token = COM_Parse (&s);
 			x = scaleForScreen(atoi(token));
+			x_640 = atoi(token);
+			width = x;
 			continue;
 		}
 		if (!strcmp(token, "xr"))
 		{
 			token = COM_Parse (&s);
 			x = viddef.width + scaleForScreen(atoi(token));
+			x_640 = viddef.width + atoi(token);
+
+			width = x;//add
 			continue;
 		}
 		if (!strcmp(token, "xv"))
 		{
 			token = COM_Parse (&s);
 			x = viddef.width/2 - scaleForScreen(160) + scaleForScreen(atoi(token));
+			x_640 = viddef.width/2 - 160 +  atoi(token);
+
+			width = x;//add
 			continue;
 		}
 		if (!strcmp(token, "yt"))
 		{
 			token = COM_Parse (&s);
 			y = scaleForScreen(atoi(token));
+			y_640 = atoi(token);
 			continue;
 		}
 		if (!strcmp(token, "yb"))
 		{
 			token = COM_Parse (&s);
 			y = viddef.height + scaleForScreen(atoi(token));
+			y_640 = viddef.height + atoi(token);
 			continue;
 		}
 		if (!strcmp(token, "yv"))
 		{
 			token = COM_Parse (&s);
 			y = viddef.height/2 - scaleForScreen(120) + scaleForScreen(atoi(token));
+			y_640 = viddef.height/2 - 120 + atoi(token);
+			continue;
+		}
+#if KINGPIN
+		if (!strcmp(token, "xm"))
+		{
+			token = COM_Parse (&s);
+            x = viddef.width / 2 + scaleForScreen(atoi(token));
+			x_640 = viddef.width / 2 + atoi(token);
+            width = x;
+			continue;
+		}
+		if (!strcmp(token, "ym"))
+		{
+			token = COM_Parse (&s);
+			y = viddef.height / 2  + scaleForScreen(atoi(token));
+			y_640 = viddef.height / 2 + atoi(token);
+            width = x;
+			continue;
+		}
+		if (!strcmp(token, "leader"))
+		{
+			int tmp;
+			token = COM_Parse (&s);
+              tmp = atoi(token);
+
+			if (tmp >= MAX_CLIENTS || tmp < 0)
+				Com_Error (ERR_DROP, "client >= MAX_CLIENTS");
+			/*
+              v18 = 260 * tmp + 20469896;
+              if ( !dword_138590C[65 * tmp] )
+                v18 = (int)&unk_1395C88;
+              sub_414010(0, 0, v18, 2 * viddef.width / 3, viddef.height);
+              sprintf(&Dest, aCurrentKingpin);
+              v205 = 1053609165;
+              v206 = 1053609165;
+              v207 = 1045220557;
+              DrawChars(viddef.width / 4 - 10 * (strlen(&Dest) >> 1), 30, (int)&Dest, (int)&v205);
+              sprintf(&Dest, aS_6, v18);
+              v205 = 1065353216;
+              v206 = 1065353216;
+              v207 = 1065353216;
+              DrawChars(viddef.width / 4 - 10 * (strlen(&Dest) >> 1), viddef.height - 80, (int)&Dest, (int)&v205);
+              goto LABEL_98;*/
 			continue;
 		}
 
+		if (!strcmp(token, "ds"))// ds RGB \xxxxxxxxxxx x x x
+		{
+			int i, R, G, B, ping, time, score;
+			char out[1024], Str[64], name[16]="", col[16];
+
+			token = COM_Parse (&s);
+			Q_strncpyz(col, token, sizeof(col));
+			if (strlen(col) < 3)
+				Q_strncpyz(col, "999", sizeof(col));
+			//Com_sprintf(out, sizeof(out), "%s %i %i %i %i", ci->name, ping, time, score);
+			R = (double)atoi(va("%c", col[0]))*28.33333333333333;
+			G = (double)atoi(va("%c", col[1]))*28.33333333333333;
+			B = (double)atoi(va("%c", col[2]))*(double)(255/9);
+
+			//client name (num)
+			token = COM_Parse (&s);
+			value = atoi(token);
+			if (value >= MAX_CLIENTS || value < 0)
+				Com_Error (ERR_DROP, "client >= MAX_CLIENTS");
+			ci = &cl.clientinfo[value];
+            if ( ci->name)
+				Com_sprintf(Str, sizeof(Str), "%s", ci->name);
+			else
+				Com_sprintf(Str, sizeof(Str), "(unknown)");
+
+			for (i = 0; i < 14; i++)
+			{
+				if (i == 13){
+					name[i] = '\0';
+					break;
+				}
+				if (Str[i])
+					name[i] = Str[i];
+				else
+					name[i] = ' ';
+			}
+
+			//ping
+			token = COM_Parse (&s);
+			ping = atoi(token);			
+
+			//time
+			token = COM_Parse (&s);
+			time = atoi(token);
+			//score
+			token = COM_Parse (&s);
+			score = atoi(token);
+
+			Com_sprintf(out, sizeof(out), "%s %3i %4i %5i", name, ping, time, score);
+			Hud_DrawStringRGBScore(x_640, y_640, out, 255, false, R, G, B);
+
+			continue;
+		}
+
+		if (!strcmp(token, "dmstr"))// dmstr RGB \"xxxxxxxxxxx x x \"
+		{
+			int i, R, G, B;
+			float scaleX, scaleY;
+			char out[1024], col[16];
+			// color RGB
+            token = COM_Parse (&s);
+			Q_strncpyz(col, token, sizeof(col));
+			if (strlen(col) < 3) Q_strncpyz(col, "999", sizeof(col));
+			R = (double)atoi(va("%c", col[0]))*28.33333333333333;
+			G = (double)atoi(va("%c", col[1]))*28.33333333333333;
+			B = (double)atoi(va("%c", col[2]))*(double)(255/9);
+
+            token = COM_Parse (&s);
+			Com_sprintf(out, sizeof(out), "%s", token);
+
+			//if hud_oldscale
+			Hud_DrawStringRGBScore(x_640, y_640, out, 255, false, R, G, B);
+
+			continue;
+		}
+
+#endif
+
 		if (!strcmp(token, "pic"))
 		{	// draw a pic from a stat number
+			int debugVal;
 			token = COM_Parse (&s);
+#if KINGPIN
+			value = atoi(token);
+
+			if (value >= OLD_MAX_IMAGES) // Knightmare- don't bomb out
+			//	Com_Error (ERR_DROP, "Pic >= MAX_IMAGES");
+			{
+				Com_Printf (S_COLOR_YELLOW"Warning: Pic >= MAX_IMAGES\n");
+				value = OLD_MAX_IMAGES-1;
+			}
+
 			value = cl.frame.playerstate.stats[atoi(token)];
+			if (value > 0)
+			{
+				;
+
+			}
+
+			/*switch (value)
+			{
+				case 0: //health //cash
+					R_DrawScaledPic (x, y, getScreenScale(), hud_alpha->value, "/pics/h_money.tga");
+					break;
+				case 1:	//?
+					break;
+				case 2: //ammo
+					cl.configstrings[OLD_CS_IMAGES + value];
+					R_DrawScaledPic(x, y, getScreenScale(), hud_alpha->value, "/pics/h_money.tga");
+			}
+			*/
+
+
+			continue;
+#else
+			value = cl.frame.playerstate.stats[atoi(token)];
+
+			debugVal = OLD_CS_IMAGES + value;
 			// Knightmare- 1/2/2002- BIG UGLY HACK for old demos or
 			// connected to server using old protocol;
 			// Changed config strings require different offsets
@@ -1952,9 +2430,13 @@ void SCR_ExecuteLayoutString (char *s, qboolean isStatusBar)
 			}
 			//end Knightmare
 			continue;
+#endif
 		}
-
+#if !KINGPIN
+		if (!strcmp(token, "ds___"))
+#else
 		if (!strcmp(token, "client"))
+#endif
 		{	// draw a deathmatch client block
 			int		score, ping, time;
 
@@ -1983,13 +2465,19 @@ void SCR_ExecuteLayoutString (char *s, qboolean isStatusBar)
 			Hud_DrawStringAlt (x+scaleForScreen(32+7*8), y+scaleForScreen(8),  va(S_COLOR_ALT"%i", score), 255, isStatusBar);
 			Hud_DrawString (x+scaleForScreen(32), y+scaleForScreen(16), va("Ping:  %i", ping), 255, isStatusBar);
 			Hud_DrawString (x+scaleForScreen(32), y+scaleForScreen(24), va("Time:  %i", time), 255, isStatusBar);
-
+#if !KINGPIN
 			if (!ci->icon)
 				ci = &cl.baseclientinfo;
 			R_DrawScaledPic(x, y, getScreenScale(), hud_alpha->value,  ci->iconname);
+#endif
 			continue;
 		}
-
+#if KINGPIN
+		if (!strcmp(token, "time"))
+		{
+			continue;
+		}
+#endif
 		if (!strcmp(token, "ctf"))
 		{	// draw a ctf client block
 			int		score, ping;
@@ -2069,80 +2557,176 @@ void SCR_ExecuteLayoutString (char *s, qboolean isStatusBar)
 			width = atoi(token);
 			token = COM_Parse (&s);
 			value = cl.frame.playerstate.stats[atoi(token)];
-			SCR_DrawField (x, y, 0, width, value, false, isStatusBar);
+			SCR_DrawField (x, y, 0, width, value, false, isStatusBar, 1);
 			continue;
 		}
 
 		if (!strcmp(token, "hnum"))
 		{	// health number
 			int		color;
+			int x_, y_;
 
 			width = 3;
 			value = cl.frame.playerstate.stats[STAT_HEALTH];
 			if (value > 25)
 				color = 0;	// green
-			else if (value > 0)
-				color = (cl.frame.serverframe>>2) & 1;		// flash
 			else
-				color = 1;
+				color = ((cl.frame.serverframe >> 2) & 1) ? 3 : 4; //flash.  red / red'er
 
-		//	if (cl.frame.playerstate.stats[STAT_FLASHES] & 1)
-		//		R_DrawScaledPic (x, y, getScreenScale(), hud_alpha->value, "field_3");
+#if KINGPIN
+			x_ = scaleForScreen(60);
+			y_ = viddef.height+scaleForScreen(-30);
+#endif
 
-			SCR_DrawField (x, y, color, width, value, (cl.frame.playerstate.stats[STAT_FLASHES] & 1), isStatusBar);
+			SCR_DrawField (x_, y_, color, width, value, (cl.frame.playerstate.stats[STAT_FLASHES] & 1), isStatusBar, 1);
+			SCR_DrawArmor(getScreenScale(), isStatusBar); //hypov8 add
 			continue;
 		}
 
 		if (!strcmp(token, "anum"))
 		{	// ammo number
-			int		color;
+			int w, h;
+			token = COM_Parse (&s);
+			value = cl.frame.playerstate.stats[atoi(token)];
 
-			width = 3;
+			if (LegacyProtocol())
+			{
+				if (value >= OLD_MAX_IMAGES) // Knightmare- don't bomb out
+				{
+					Com_Printf(S_COLOR_YELLOW"Warning: Pic >= MAX_IMAGES\n");
+					value = OLD_MAX_IMAGES - 1;
+				}
+				if (cl.configstrings[OLD_CS_IMAGES + value])
+				{
+					R_DrawScaledPic (viddef.width+ scaleForScreen(-25), viddef.height+ scaleForScreen(-30), .5*getScreenScale(), hud_alpha->value, cl.configstrings[OLD_CS_IMAGES+value]);
+				}
+			}
+
+
 			value = cl.frame.playerstate.stats[STAT_AMMO];
-			if (value > 5)
-				color = 0;	// green
-			else if (value >= 0)
-				color = (cl.frame.serverframe>>2) & 1;		// flash
-			else
+			if (value < 0)
 				continue;	// negative number = don't show
 
-		//	if (cl.frame.playerstate.stats[STAT_FLASHES] & 4)
-		//		R_DrawScaledPic (x, y, getScreenScale(), hud_alpha->value, "field_3");
-
-			SCR_DrawField (x, y, color, width, value, (cl.frame.playerstate.stats[STAT_FLASHES] & 4), isStatusBar);
+			SCR_DrawField (viddef.width + scaleForScreen(-60), viddef.height + scaleForScreen(-20), 0, 3, value, (cl.frame.playerstate.stats[STAT_FLASHES] & 4), isStatusBar, 1);
 			continue;
 		}
+
+#if KINGPIN
+		if (!strcmp(token, "wanum"))
+		{	// weapon ammo number
+			int x_, y_; //just incase its used later
+			width = 3;
+			value = cl.frame.playerstate.stats[STAT_CLIP];
+			if (value < 0)	continue;	// negative number = don't show
+
+			x_ = viddef.width + scaleForScreen(-40); //yb
+			y_ = viddef.height + scaleForScreen(-50); //yb
+
+			SCR_DrawField (x_, y_, 0, width, value, (cl.frame.playerstate.stats[STAT_FLASHES] & 4), isStatusBar, 1);
+			continue;
+		}
+
+		if (!strcmp(token, "cnum"))
+		{	// cash
+
+			width = 3;
+			value = cl.frame.playerstate.stats[STAT_CASH];
+			if (value < 0) continue;	// negative number = don't show
+
+			x = viddef.width -50; //yb
+			y = viddef.height -30; //yb
+
+			SCR_DrawField (x, y, 0, width, value, (cl.frame.playerstate.stats[STAT_FLASHES] & 4), isStatusBar, 1);
+			continue;
+		}
+
+		if (!strcmp(token, "frags"))
+		{	// frags
+			int x_, y_; //just incase its used later
+			x_ =  viddef.width + scaleForScreen(-75);
+			y_ = scaleForScreen(20);
+			Hud_DrawString (x_, y_, "frags", 255, isStatusBar);
+			/*x_ = viddef.width + scaleForScreen(-43);
+			y_ = scaleForScreen(5);
+
+
+			width = 3;
+			value = cl.frame.playerstate.stats[STAT_FRAGS];
+			if (value < 0)	
+				continue;	// negative number = don't show
+
+			SCR_DrawField (x_, y_, 0, width, value, (cl.frame.playerstate.stats[STAT_FLASHES] & 4), isStatusBar, 1);*/
+			continue;
+		}
+
+#endif
 
 		if (!strcmp(token, "rnum"))
 		{	// armor number
-			int		color;
-
 			width = 3;
-			value = cl.frame.playerstate.stats[STAT_ARMOR];
-			if (value < 1)
-				continue;
+			value = cl.frame.playerstate.stats[STAT_ARMOR1]; //hypov8 todo: fix hud
+			if (value < 1)	continue;
 
-			color = 0;	// green
-
-		//	if (cl.frame.playerstate.stats[STAT_FLASHES] & 2)
-		//		R_DrawScaledPic (x, y, getScreenScale(), hud_alpha->value, "field_3");
-
-			SCR_DrawField (x, y, color, width, value, (cl.frame.playerstate.stats[STAT_FLASHES] & 2), isStatusBar);
+			SCR_DrawField (x, y, 0, width, value, (cl.frame.playerstate.stats[STAT_FLASHES] & 2), isStatusBar, 1);
 			continue;
 		}
 
-
+		//for picked up items. armour etc. shows pic in hud
 		if (!strcmp(token, "stat_string"))
 		{
+#if KINGPIN //"	stat_string 8 7 "
+
+			//STAT_PICKUP_STRING 8
+			token = COM_Parse (&s);
+			//hypov8 todo: what is this??
+
+			//STAT_PICKUP_ICON 7
+			token = COM_Parse (&s);
+
+			value = cl.frame.playerstate.stats[atoi(token)];
+			if ( LegacyProtocol() )
+			{
+				if (value >= OLD_MAX_IMAGES) // Knightmare- don't bomb out
+				{
+					Com_Printf (S_COLOR_YELLOW"Warning: Pic >= MAX_IMAGES\n");
+					value = OLD_MAX_IMAGES-1;
+				}
+				if (cl.configstrings[OLD_CS_IMAGES+value])
+				{
+					//R_DrawScaledPic (viddef.width / 2, viddef.height + scaleForScreen(-50), .5* getScreenScale(), hud_alpha->value, cl.configstrings[OLD_CS_IMAGES+value]);
+					R_DrawScaledPic (scaleForScreen(x), scaleForScreen(y), .5* getScreenScale(), hud_alpha->value, cl.configstrings[OLD_CS_IMAGES+value]);
+				}
+			}
+			else
+			{
+				if (value >= MAX_IMAGES) // Knightmare- don't bomb out
+				//	Com_Error (ERR_DROP, "Pic >= MAX_IMAGES");
+				{
+					Com_Printf (S_COLOR_YELLOW"Warning: Pic >= MAX_IMAGES\n");
+					value = MAX_IMAGES-1;
+				}
+				if (cl.configstrings[CS_IMAGES+value])
+				{
+					R_DrawScaledPic (viddef.width / 2, viddef.height + scaleForScreen(-50), .5* getScreenScale(), hud_alpha->value, cl.configstrings[CS_IMAGES+value]);
+				}
+			}
+			//end Knightmare
+			continue;
+
+#else
+
 			token = COM_Parse (&s);
 			index = atoi(token);
-			if (index < 0 || index >= MAX_CONFIGSTRINGS)
+			if (index < 0 || index >= MAX_STATS)
 				Com_Error (ERR_DROP, "Bad stat_string index");
+
 			index = cl.frame.playerstate.stats[index];
 			if (index < 0 || index >= MAX_CONFIGSTRINGS)
 				Com_Error (ERR_DROP, "Bad stat_string index");
-			Hud_DrawString (x, y, cl.configstrings[index], 255, isStatusBar);
+			Hud_DrawString (300, 440, cl.configstrings[CS_IMAGES+index], 255, isStatusBar);
+
 			continue;
+#endif
 		}
 
 		if (!strcmp(token, "cstring"))
@@ -2156,6 +2740,7 @@ void SCR_ExecuteLayoutString (char *s, qboolean isStatusBar)
 		{
 			token = COM_Parse (&s);
 			Hud_DrawString (x, y, token, 255, isStatusBar);
+			//Hud_DrawString_fixed (x_640, y_640, token, 255, isStatusBar);
 			continue;
 		}
 
@@ -2192,7 +2777,6 @@ void SCR_ExecuteLayoutString (char *s, qboolean isStatusBar)
 
 	}
 }
-
 
 /*
 ================
@@ -2380,6 +2964,9 @@ void SCR_UpdateScreen (void)
 
 			SCR_DrawNet ();
 			SCR_CheckDrawCenterString ();
+#if KINGPIN
+			SCR_CheckDrawChatString ();
+#endif
 
 			if (scr_timegraph->value)
 				SCR_DebugGraph (cls.netFrameTime*300, 0);

@@ -120,8 +120,11 @@ void SetFontCursor (void)
 	s_options_interface_font_box.curvalue = 0;
 
 	if (!con_font)
+#if KINGPIN
+		con_font = Cvar_Get ("con_font", "newfont", CVAR_ARCHIVE);
+#else
 		con_font = Cvar_Get ("con_font", "default", CVAR_ARCHIVE);
-
+#endif
 	if (numfonts>1)
 		for (i=0; font_names[i]; i++)
 		{
@@ -331,8 +334,8 @@ void Options_Interface_MenuInit ( void )
 
 	int y = 3*MENU_LINE_SIZE;
 
-	s_options_interface_menu.x = SCREEN_WIDTH*0.5;
-	s_options_interface_menu.y = SCREEN_HEIGHT*0.5 - 58;
+	s_options_interface_menu.x = 460; //SCREEN_WIDTH*0.5;
+	s_options_interface_menu.y = 100;// SCREEN_HEIGHT*0.5 - 58;
 	s_options_interface_menu.nitems = 0;
 
 	s_options_interface_header.generic.type		= MTYPE_SEPARATOR;
@@ -460,8 +463,11 @@ void Options_Interface_MenuInit ( void )
 
 void Options_Interface_MenuDraw (void)
 {
+#if KINGPIN
+	M_Main_Draw();
+#else
 	Menu_DrawBanner( "m_banner_options" );
-
+#endif
 	Menu_AdjustCursor( &s_options_interface_menu, 1 );
 	Menu_Draw( &s_options_interface_menu );
 }

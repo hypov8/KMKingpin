@@ -1582,12 +1582,12 @@ void SP_worldspawn (edict_t *ent)
 		gi.configstring (CS_SKY, st.sky);
 	else
 		gi.configstring (CS_SKY, "unit1_");
-
+#if !KINGPIN //hypov8 todo: dll
 	gi.configstring (CS_SKYROTATE, va("%f", st.skyrotate) );
 
 	gi.configstring (CS_SKYAXIS, va("%f %f %f",
 		st.skyaxis[0], st.skyaxis[1], st.skyaxis[2]) );
-
+#endif
 	// Knightmare- if a named soundtrack is specified, play it instead of from CD
 	if (ent->musictrack && strlen(ent->musictrack))
 		gi.configstring (CS_CDTRACK, ent->musictrack);
@@ -1640,7 +1640,9 @@ void SP_worldspawn (edict_t *ent)
 	gi.imageindex ("i_help");
 	level.pic_health = gi.imageindex ("i_health");
 	gi.imageindex ("help");
+#if !KINGPIN
 	gi.imageindex ("field_3");
+#endif
 
 	if (!st.gravity)
 		gi.cvar_set("sv_gravity", "800");

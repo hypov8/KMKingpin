@@ -505,11 +505,15 @@ void G_SetStats (edict_t *ent)
 	//
 	// health
 	//
+#if !KINGPIN //hypov8 todo: dll
 	ent->client->ps.stats[STAT_HEALTH_ICON] = level.pic_health;
+#endif
 	ent->client->ps.stats[STAT_HEALTH] = ent->health;
 #ifdef KMQUAKE2_ENGINE_MOD	// for enhanced HUD
 //	ent->client->ps.stats[STAT_MAXHEALTH] = min(max(ent->client->pers.max_health, 0), 10000);
+	#if !KINGPIN //hypov8 todo: dll
 	ent->client->ps.stats[STAT_MAXHEALTH] = min(max(ent->max_health, 0), 10000);
+	#endif
 #endif
 
 	//
@@ -520,7 +524,9 @@ void G_SetStats (edict_t *ent)
 		ent->client->ps.stats[STAT_AMMO_ICON] = 0;
 		ent->client->ps.stats[STAT_AMMO] = 0;
 #ifdef KMQUAKE2_ENGINE_MOD	// for enhanced HUD
+	#if !KINGPIN //hypov8 todo: dll
 		ent->client->ps.stats[STAT_MAXAMMO] = 0;
+	#endif
 #endif
 	}
 	else
@@ -529,7 +535,9 @@ void G_SetStats (edict_t *ent)
 		ent->client->ps.stats[STAT_AMMO_ICON] = gi.imageindex (item->icon);
 		ent->client->ps.stats[STAT_AMMO] = ent->client->pers.inventory[ent->client->ammo_index];
 #ifdef KMQUAKE2_ENGINE_MOD	// for enhanced HUD
+	#if !KINGPIN //hypov8 todo: dll
 		ent->client->ps.stats[STAT_MAXAMMO] = min(max(GetMaxAmmoByIndex(ent->client, ent->client->ammo_index), 0), 10000);
+	#endif
 #endif
 	}
 	
@@ -537,6 +545,7 @@ void G_SetStats (edict_t *ent)
 	// armor
 	//
 	power_armor_type = PowerArmorType (ent);
+#if !KINGPIN //hypov8 todo: dll
 	if (power_armor_type)
 	{
 		cells = ent->client->pers.inventory[ITEM_INDEX(FindItem ("cells"))];
@@ -577,6 +586,7 @@ void G_SetStats (edict_t *ent)
 		ent->client->ps.stats[STAT_MAXARMOR] = 0;
 #endif
 	}
+#endif
 
 	//
 	// pickup message
@@ -590,6 +600,7 @@ void G_SetStats (edict_t *ent)
 	//
 	// timers
 	//
+#if !KINGPIN //hypov8 todo: dll
 	if (ent->client->quad_framenum > level.framenum)
 	{
 		ent->client->ps.stats[STAT_TIMER_ICON] = gi.imageindex ("p_quad");
@@ -651,15 +662,17 @@ void G_SetStats (edict_t *ent)
 		ent->client->ps.stats[STAT_TIMER_RANGE] = 0;
 #endif
 	}
+#endif
 
 	//
 	// selected item
 	//
+#if !KINGPIN //hypov8 todo: dll
 	if (ent->client->pers.selected_item == -1)
 		ent->client->ps.stats[STAT_SELECTED_ICON] = 0;
 	else
 		ent->client->ps.stats[STAT_SELECTED_ICON] = gi.imageindex (itemlist[ent->client->pers.selected_item].icon);
-
+#endif
 	ent->client->ps.stats[STAT_SELECTED_ITEM] = ent->client->pers.selected_item;
 
 	// Lazarus vehicle/tracktrain
@@ -684,6 +697,7 @@ void G_SetStats (edict_t *ent)
 	}
 	else
 	{
+#if !KINGPIN //hypov8 todo: dll
 		if(ent->vehicle && !(ent->vehicle->spawnflags & 16))
 		{
 			switch(ent->vehicle->moveinfo.state)
@@ -699,6 +713,7 @@ void G_SetStats (edict_t *ent)
 		}
 		else
 			ent->client->ps.stats[STAT_SPEED] = 0;
+#endif
 	}
 
 	// "whatsit"
@@ -757,9 +772,10 @@ void G_SetStats (edict_t *ent)
 		ent->client->ps.stats[STAT_HELPICON] = gi.imageindex (ent->client->pers.weapon->icon);
 	else
 		ent->client->ps.stats[STAT_HELPICON] = 0;
-
+#if !KINGPIN //hypov8 todo: dll
 #ifdef KMQUAKE2_ENGINE_MOD	// for enhanced HUD
-	if (ent->client->pers.weapon) {
+	if (ent->client->pers.weapon) 
+	{
 		if (ITEM_INDEX(ent->client->pers.weapon) == hml_index) // homing rocket launcher has no icon
 			ent->client->ps.stats[STAT_WEAPON] = gi.imageindex (GetItemByIndex(rl_index)->icon);
 		else
@@ -775,7 +791,7 @@ void G_SetStats (edict_t *ent)
 		ent->client->ps.stats[STAT_ZOOM] = gi.imageindex("zoom");
 	else
 		ent->client->ps.stats[STAT_ZOOM] = 0;
-
+#endif
 //ZOID
 	SetCTFStats(ent);
 //ZOID
@@ -830,20 +846,21 @@ void G_SetSpectatorStats (edict_t *ent)
 
 	if (!cl->chase_target)
 		G_SetStats (ent);
-
+#if !KINGPIN //hypov8 todo: dll
 	cl->ps.stats[STAT_SPECTATOR] = 1;
-
+#endif
 	// layouts are independent in spectator
 	cl->ps.stats[STAT_LAYOUTS] = 0;
 	if (cl->pers.health <= 0 || level.intermissiontime || cl->showscores)
 		cl->ps.stats[STAT_LAYOUTS] |= 1;
 	if (cl->showinventory && cl->pers.health > 0)
 		cl->ps.stats[STAT_LAYOUTS] |= 2;
-
+#if !KINGPIN //hypov8 todo: dll
 	if (cl->chase_target && cl->chase_target->inuse)
 		cl->ps.stats[STAT_CHASE] = CS_PLAYERSKINS + 
 			(cl->chase_target - g_edicts) - 1;
 	else
 		cl->ps.stats[STAT_CHASE] = 0;
+#endif
 }
 

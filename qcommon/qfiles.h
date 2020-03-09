@@ -71,9 +71,99 @@ typedef struct
     unsigned short	bytes_per_line;
     unsigned short	palette_type;
     char	filler[58];
-    unsigned char	data;			// unbounded
+    unsigned char	data[];			// unbounded //hypov8 add*
 } pcx_t;
 
+/*
+========================================================================
+
+.MDX triangle model file format
+
+========================================================================
+*/
+#if KINGPIN
+#define IDALIASHEADER_KP		(('X'<<24)+('P'<<16)+('D'<<8)+'I')
+#define ALIAS_VERSION_KP 4
+
+#define	MAX_TRIANGLES_KP	4096
+#define MAX_VERTS_KP		2048
+#define MAX_FRAMES_KP		1024 //hypov8 was 512. models\actors\whore\body.mdx has 1024
+#define MAX_MDXSKINS_KP	32
+#define	MAX_SKINNAME_KP	64
+
+//#define MAX_MDX_GLCMDS (MAX_TRIANGLES_KP*MAX_VERTS_KP)
+
+//vertex posi (from frame)
+//vertPos[3], normalIndex
+typedef struct
+{
+	byte	v_Pos[3];	// scaled byte to fit in frame mins/maxs
+	byte	v_normID;	//vertexNormal Q2index. shared normals!!
+} d_mdx_vert_t;
+
+
+typedef struct 
+{
+	short	tri_vertID[3]; //3 vertex index to make a tri
+	short	tri_normIDx[3]; //vertex normal index ID
+} d_mdx_tri_t;
+
+
+//mdx frame
+typedef struct
+{
+	float		scale[3];	// multiply byte verts by this
+	float		translate[3];	// then add this
+	char		name[16];	// frame name from grabbing
+	d_mdx_vert_t vert_data[MAX_VERTS_KP];	// variable sized //hypov8 todo: fix this
+} d_mdx_frame_t;
+
+// GL VERTEX  st + vertIndex
+typedef struct
+{
+	float	gl_s;
+	float	gl_t;
+	int		gl_vIdx; //index//kp gl command
+} d_mdx_glVert_t;
+
+//GL OBJECT HEADDER
+typedef struct
+{
+	int TrisTypeNum;
+	int SubObjectID;
+	//d_mdx_glVert_t gl_data[1];	// variable sized //hypov8 todo: fix this
+} d_mdx_glHeader_t;
+
+typedef struct
+{
+	int			ident;		//idx
+	int			version;	//4
+
+	int			skinwidth;
+	int			skinheight;
+	int			framesize;		// byte size of each frame
+
+	int			num_skins;
+	int			num_verts;		//vertex count
+	int			num_tris;
+	int			num_glcmds;		// dwords in strip/fan command list
+	int			num_frames;
+	int			numSfxDefines; //kp	// number of sfx definitions
+    int			numSfxEntries; //kp	// number of sfx entries
+    int			numSubObjects; //kp	// number of subobjects
+
+	int			ofs_skins;		/*d_mdx_skin_t*/	//name[64];
+	int			ofs_tris;		/*d_mdx_tri_t*/		//tri_vertID[3], tri_normID[3].
+	int			ofs_frames;		/*d_mdx_frame_t*/	//vertex pos, vertex normalIDX
+	int			ofs_glcmds;		//triCount(-/+ is type), objectNum, (tri1)s,t, vertIdx... (tri2)s,t,vertIdx...
+	int			ofs_VertInfo;	//kp
+	int			ofs_SfxDefines; //kp
+	int			ofs_SfxEntries; //kp
+	int			ofs_BBoxFrames; //kp
+	int			ofs_DummyEnd;	//kp
+	int			ofs_end;		// end of file
+} d_mdx_head_t;
+#endif
 
 /*
 ========================================================================
@@ -83,32 +173,33 @@ typedef struct
 ========================================================================
 */
 
-#define IDALIASHEADER		(('2'<<24)+('P'<<16)+('D'<<8)+'I')
-#define ALIAS_VERSION	8
+#if 1
+#define ALIAS_MD2_HEADER		(('2'<<24)+('P'<<16)+('D'<<8)+'I')
+#define ALIAS_MD2_VERSION	8
 
-#define	MAX_TRIANGLES	4096
-#define MAX_VERTS		2048
-#define MAX_FRAMES		512
-#define MAX_MD2SKINS	32
-#define	MAX_SKINNAME	64
+#define	MAX_MD2_TRIANGLES	4096
+#define MAX_MD2_VERTS		2048
+#define MAX_MD2_FRAMES		512
+#define MAX_MD2_SKINS		32
+#define	MAX_MD2_SKINNAME	64
 
 typedef struct
 {
 	short	s;
 	short	t;
-} dstvert_t;
+} stvert_md2_t;
 
 typedef struct 
 {
 	short	index_xyz[3];
 	short	index_st[3];
-} dtriangle_t;
+} triangle_md2_t;
 
 typedef struct
 {
 	byte	v[3];			// scaled byte to fit in frame mins/maxs
 	byte	lightnormalindex;
-} dtrivertx_t;
+} trivertx_md2_t;
 
 #define DTRIVERTX_V0   0
 #define DTRIVERTX_V1   1
@@ -121,8 +212,8 @@ typedef struct
 	float		scale[3];	// multiply byte verts by this
 	float		translate[3];	// then add this
 	char		name[16];	// frame name from grabbing
-	dtrivertx_t	verts[1];	// variable sized
-} daliasframe_t;
+	trivertx_md2_t	verts[1];	// variable sized
+} aliasframe_md2_t;
 
 
 // the glcmd format:
@@ -157,7 +248,96 @@ typedef struct
 	int			ofs_glcmds;	
 	int			ofs_end;		// end of file
 
-} dmdl_t;
+} header_md2_t;
+#endif
+
+
+/*
+========================================================================
+
+.MDX triangle model file format
+
+========================================================================
+*/
+
+#if KINGPIN
+#define ALIAS_MDX_HEADER	(('X'<<24)+('P'<<16)+('D'<<8)+'I')
+#define ALIAS_MDX_VERSION	4
+
+#define	MAX_MDX_TRIANGLES	4096
+#define MAX_MDX_VERTS		2048
+#define MAX_MDX_FRAMES		1024
+#define MAX_MDX_SKINS		32
+#define	MAX_MDX_SKINNAME	64
+
+/*typedef struct
+{
+	short	s;
+	short	t;
+} stvert_mdx_t;*/
+
+typedef struct 
+{
+	short	index_xyz[3];
+	short	index_st[3];
+} triangle_mdx_t;
+
+typedef struct
+{
+	byte	v[3];			// scaled byte to fit in frame mins/maxs
+	byte	lightnormalindex;
+} trivertx_mdx_t;
+
+typedef struct
+{
+	float		scale[3];	// multiply byte verts by this
+	float		translate[3];	// then add this
+	char		name[16];	// frame name from grabbing
+	trivertx_mdx_t	verts[1];	// variable sized
+} aliasframe_mdx_t;
+
+
+// the glcmd format:
+// a positive integer starts a tristrip command, followed by that many
+// vertex structures.
+// a negative integer starts a trifan command, followed by -x vertexes
+// a zero indicates the end of the command list.
+// a vertex consists of a floating point s, a floating point t,
+// and an integer vertex index.
+
+
+typedef struct
+{
+	int			ident;
+	int			version;
+
+	int			skinwidth;
+	int			skinheight;
+	int			framesize;		// byte size of each frame
+
+	int			num_skins;
+	int			num_vert;
+	int			num_tris;
+	int			num_glcmds;		// dwords in strip/fan command list
+	int			num_frames;
+	  int num_SfxDefines; 
+    int num_SfxEntries; 
+    int num_SubObjects; 
+
+	int			ofs_skins;		// each skin is a MAX_SKINNAME string
+	int			ofs_tris;		// offset for dtriangles
+	int			ofs_frames;		// offset for first frame
+	int			ofs_glcmds;	
+	   int ofs_VertexInfo; 
+    int ofs_SfxDefines; 
+    int ofs_SfxEntries; 
+    int ofs_BBoxFrames; 
+    int ofs_DummyEnd; 
+	int			ofs_end;		// end of file
+
+} header_mdx_t;
+#endif
+
 
 /*
 ========================================================================
@@ -286,7 +466,7 @@ typedef struct
 {
 	int		width, height;
 	int		origin_x, origin_y;		// raster coordinates inside pic
-	char	name[MAX_SKINNAME];		// name of pcx file
+	char	name[MAX_MD2_SKINNAME];		// name of pcx file
 } dsprframe_t;
 
 typedef struct {
@@ -381,33 +561,33 @@ typedef struct
 	int		fileofs, filelen;
 } lump_t;
 
-#define	LUMP_ENTITIES		0
-#define	LUMP_PLANES			1
-#define	LUMP_VERTEXES		2
-#define	LUMP_VISIBILITY		3
-#define	LUMP_NODES			4
-#define	LUMP_TEXINFO		5
-#define	LUMP_FACES			6
-#define	LUMP_LIGHTING		7
-#define	LUMP_LEAFS			8
-#define	LUMP_LEAFFACES		9
-#define	LUMP_LEAFBRUSHES	10
-#define	LUMP_EDGES			11
-#define	LUMP_SURFEDGES		12
-#define	LUMP_MODELS			13
-#define	LUMP_BRUSHES		14
-#define	LUMP_BRUSHSIDES		15
-#define	LUMP_POP			16
-#define	LUMP_AREAS			17
-#define	LUMP_AREAPORTALS	18
-#define	HEADER_LUMPS		19
+#define	LUMP_ENTITIES_Q2		0
+#define	LUMP_PLANES_Q2			1
+#define	LUMP_VERTEXES_Q2		2
+#define	LUMP_VISIBILITY_Q2		3
+#define	LUMP_NODES_Q2			4
+#define	LUMP_TEXINFO_Q2			5
+#define	LUMP_FACES_Q2			6
+#define	LUMP_LIGHTING_Q2		7
+#define	LUMP_LEAFS_Q2			8
+#define	LUMP_LEAFFACES_Q2		9
+#define	LUMP_LEAFBRUSHES_Q2		10
+#define	LUMP_EDGES_Q2			11
+#define	LUMP_SURFEDGES_Q2		12
+#define	LUMP_MODELS_Q2			13
+#define	LUMP_BRUSHES_Q2			14
+#define	LUMP_BRUSHSIDES_Q2		15
+#define	LUMP_POP_Q2				16
+#define	LUMP_AREAS_Q2			17
+#define	LUMP_AREAPORTALS_Q2		18
+#define	HEADER_LUMPS_Q2			19
 
 typedef struct
 {
 	int			ident;
 	int			version;	
-	lump_t		lumps[HEADER_LUMPS];
-} dheader_t;
+	lump_t		lumps[HEADER_LUMPS_Q2];
+} dheader_q2_t;
 
 typedef struct
 {
@@ -416,13 +596,13 @@ typedef struct
 	int			headnode;
 	int			firstface, numfaces;	// submodels just draw faces
 										// without walking the bsp tree
-} dmodel_t;
+} dmodel_q2_t;
 
 
 typedef struct
 {
 	float	point[3];
-} dvertex_t;
+} dvertex_q2_t;
 
 
 // 0-2 are axial planes
@@ -442,7 +622,7 @@ typedef struct
 	float	normal[3];
 	float	dist;
 	int		type;		// PLANE_X - PLANE_ANYZ ?remove? trivial to regenerate
-} dplane_t;
+} dplane_q2_t;
 
 
 // contents flags are seperate bits
@@ -508,7 +688,7 @@ typedef struct
 	short		maxs[3];								// change to int
 	unsigned short	firstface;				// change to int
 	unsigned short	numfaces;	// counting both sides //change to int
-} dnode_t;
+} dnode_q2_t;
 
 
 typedef struct texinfo_s
@@ -518,7 +698,7 @@ typedef struct texinfo_s
 	int			value;			// light emission, etc
 	char		texture[32];	// texture name (textures/*.wal)
 	int			nexttexinfo;	// for animations, -1 = end of chain
-} texinfo_t;
+} texinfo_q2_t;
 
 
 // note that edge 0 is never used, because negative edge nums are used for
@@ -526,7 +706,7 @@ typedef struct texinfo_s
 typedef struct
 {
 	unsigned short	v[2];		// vertex numbers //change to int
-} dedge_t;
+} dedge_q2_t;
 
 #define	MAXLIGHTMAPS	4
 typedef struct
@@ -558,20 +738,20 @@ typedef struct
 
 	unsigned short	firstleafbrush;		// change to int
 	unsigned short	numleafbrushes;		// change to int
-} dleaf_t;
+} dleaf_q2_t;
 
 typedef struct
 {
 	unsigned short	planenum;		// facing out of the leaf	// change to int
 	short	texinfo;
-} dbrushside_t;
+} dbrushside_q2_t;
 
 typedef struct
 {
 	int			firstside;
 	int			numsides;
 	int			contents;
-} dbrush_t;
+} dbrush_q2_t;
 
 #define	ANGLE_UP	-1
 #define	ANGLE_DOWN	-2
@@ -586,7 +766,7 @@ typedef struct
 {
 	int			numclusters;
 	int			bitofs[8][2];	// bitofs[numclusters][2]
-} dvis_t;
+} dvis_q2_t;
 
 // each area has a list of portals that lead into other areas
 // when portals are closed, other areas may not be visible or
@@ -595,13 +775,13 @@ typedef struct
 {
 	int		portalnum;
 	int		otherarea;
-} dareaportal_t;
+} dareaportal_q2_t;
 
 typedef struct
 {
 	int		numareaportals;
 	int		firstareaportal;
-} darea_t;
+} darea_q2_t;
 
 
 //Knightmare- below is upper bounds for Q3 maps
@@ -723,7 +903,7 @@ typedef struct
 {
 	int		ident;
 	int		version;	
-	lump_t	lumps[HEADER_LUMPS];
+	lump_t	lumps[HEADER_LUMPS_Q2];
 } bsp39_dheader_t;
 
 typedef struct

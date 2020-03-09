@@ -168,7 +168,7 @@ void SV_EmitPacketEntities (client_frame_t *from, client_frame_t *to, sizebuf_t 
 			// in any bytes being emited if the entity has not changed at all
 			// note that players are always 'newentities', this updates their oldorigin always
 			// and prevents warping
-			MSG_WriteDeltaEntity (oldent, newent, msg, false, newent->number <= maxclients->value);
+			MSG_WriteDeltaEntity (oldent, newent, msg, false, newent->number <= (int)maxclients->value);
 			oldindex++;
 			newindex++;
 			continue;
@@ -297,7 +297,7 @@ void SV_WritePlayerstateToClient (client_frame_t *from, client_frame_t *to, size
 	if (ps->gunframe != ops->gunframe)
 		pflags |= PS_WEAPONFRAME;
 
-#ifdef NEW_PLAYER_STATE_MEMBERS
+#if !KINGPIN //def NEW_PLAYER_STATE_MEMBERS
 	//Knightmare added
 	if (ps->gunskin != ops->gunskin)
 		pflags |= PS_WEAPONSKIN;
@@ -325,17 +325,35 @@ void SV_WritePlayerstateToClient (client_frame_t *from, client_frame_t *to, size
 		pflags |= PS_STOPSPEED;
 #endif	//end Knightmare
 
+
+#if KINGPIN //
+	if (ps->gunindex != ops->gunindex)
+		pflags |= PS_WEAPONINDEX;
+	else
+	{
+		for (i=0; i<MAX_MODEL_PARTS; i++)
+			if (memcmp(&ps->model_parts[i], &ops->model_parts[i], sizeof(ps->model_parts[i])))
+			{
+				pflags |= PS_WEAPONINDEX;
+				break;
+			}
+	}
+
+#else
+
 	pflags |= PS_WEAPONINDEX;
 	pflags |= PS_WEAPONINDEX2; //Knightmare added
-
+#endif
 
 	//
 	// write it
 	//
 	MSG_WriteByte (msg, svc_playerinfo);
-	//MSG_WriteShort (msg, pflags);
+#if KINGPIN 
+	MSG_WriteShort (msg, pflags);
+#else
 	MSG_WriteLong (msg, pflags); //Knightmare- write as long
-
+#endif
 	//
 	// write the pmove_state_t
 	//
@@ -344,7 +362,7 @@ void SV_WritePlayerstateToClient (client_frame_t *from, client_frame_t *to, size
 
 	if (pflags & PS_M_ORIGIN) // FIXME- map size
 	{
-#ifdef LARGE_MAP_SIZE
+#if !KINGPIN //def LARGE_MAP_SIZE
 		MSG_WritePMCoordNew (msg, ps->pmove.origin[0]);
 		MSG_WritePMCoordNew (msg, ps->pmove.origin[1]);
 		MSG_WritePMCoordNew (msg, ps->pmove.origin[2]);
@@ -385,7 +403,11 @@ void SV_WritePlayerstateToClient (client_frame_t *from, client_frame_t *to, size
 	{
 		MSG_WriteChar (msg, ps->viewoffset[0]*4);
 		MSG_WriteChar (msg, ps->viewoffset[1]*4);
+#if	KINGPIN
+		MSG_WriteAngle16 (msg, ps->viewoffset[2]);
+#else
 		MSG_WriteChar (msg, ps->viewoffset[2]*4);
+#endif
 	}
 
 	if (pflags & PS_VIEWANGLES)
@@ -402,15 +424,82 @@ void SV_WritePlayerstateToClient (client_frame_t *from, client_frame_t *to, size
 		MSG_WriteChar (msg, ps->kick_angles[2]*4);
 	}
 
+
 	if (pflags & PS_WEAPONINDEX)	//Knightmare- 12/23/2001- send as short
 		MSG_WriteShort (msg, ps->gunindex);
-
+#if !KINGPIN 
 #ifdef NEW_PLAYER_STATE_MEMBERS	//Knightmare added
 	if (pflags & PS_WEAPONINDEX2)
 		MSG_WriteShort (msg, ps->gunindex2); //Knightmare- gunindex2 support
 #endif		
 
-	if ((pflags & PS_WEAPONFRAME) || (pflags & PS_WEAPONFRAME2))
+#else
+	if (pflags & PS_WEAPONINDEX)
+	{
+		MSG_WriteByte(msg, ps->gunframe);
+		{
+			int i, c = 0;
+			for (i = 0; i < MAX_MODEL_PARTS; i++)
+				if (memcmp(&ps->model_parts[i], &ops->model_parts[i], sizeof(ps->model_parts[i])))
+					c |= 1 << i;
+			MSG_WriteByte(msg,c);
+			for (i = 0; i < MAX_MODEL_PARTS; i++)
+			{
+				if (c&(1 << i))
+				{
+					int c2 = 0;
+					if (ps->model_parts[i].modelindex != ops->model_parts[i].modelindex)
+						c2 |= 1;
+					if (ps->model_parts[i].invisible_objects != ops->model_parts[i].invisible_objects)
+						c2 |= 2;
+					if (memcmp(&ps->model_parts[i].skinnum, &ops->model_parts[i].skinnum, sizeof(ps->model_parts[i].skinnum)))
+						c2 |= 4;
+					MSG_WriteByte(msg,c2);
+					if (c2 & 1)
+						MSG_WriteByte(msg,ps->model_parts[i].modelindex);
+					if (c2 & 2)
+						MSG_WriteByte(msg,ps->model_parts[i].invisible_objects);
+					if (c2 & 4)
+					{
+						int i2, c3 = 0;
+						for (i2 = 0; i2 < MAX_MODEL_PARTS; i2++)
+						{
+							if (ps->model_parts[i].skinnum[i2] != ops->model_parts[i].skinnum[i2])
+								c3 |= 1 << i2;
+						}
+						MSG_WriteByte(msg,c3);
+						for (i2 = 0; i2 < MAX_MODEL_PARTS; i2++)
+							if (c3 & (1 << i2))
+								MSG_WriteByte(msg,ps->model_parts[i].skinnum[i2]);
+					}
+				}
+			}
+		}
+
+	}
+#endif
+
+	if (pflags & PS_WEAPONFRAME)
+	{
+		MSG_WriteByte(msg, ps->gunframe);
+#if KINGPIN
+		//if (extraflags & EPS_GUNOFFSET)
+		{
+			MSG_WriteChar(msg,(int)(ps->gunoffset[0] * 4));
+			MSG_WriteChar(msg,(int)(ps->gunoffset[1] * 4));
+			MSG_WriteChar(msg,(int)(ps->gunoffset[2] * 4));
+		}
+		//if (extraflags & EPS_GUNANGLES)
+		{
+			MSG_WriteChar (msg,(int)(ps->gunangles[0]*4));
+			MSG_WriteChar (msg,(int)(ps->gunangles[1]*4));
+			MSG_WriteChar (msg,(int)(ps->gunangles[2]*4));
+		}
+#endif
+	}
+
+#if !KINGPIN
+	if ((pflags & PS_WEAPONFRAME) || (pflags & PS_WEAPONFRAME2)	)
 	{
 		if (pflags & PS_WEAPONFRAME)
 			MSG_WriteByte (msg, ps->gunframe);
@@ -418,17 +507,17 @@ void SV_WritePlayerstateToClient (client_frame_t *from, client_frame_t *to, size
 #ifdef NEW_PLAYER_STATE_MEMBERS 	//Knightmare added
 		if (pflags & PS_WEAPONFRAME2)
 			MSG_WriteByte (msg, ps->gunframe2); //Knightmare- gunframe2 support
-#endif
-
 		MSG_WriteChar (msg, ps->gunoffset[0]*4);
 		MSG_WriteChar (msg, ps->gunoffset[1]*4);
 		MSG_WriteChar (msg, ps->gunoffset[2]*4);
 		MSG_WriteChar (msg, ps->gunangles[0]*4);
 		MSG_WriteChar (msg, ps->gunangles[1]*4);
 		MSG_WriteChar (msg, ps->gunangles[2]*4);
+#endif
 	}
+#endif
 
-#ifdef NEW_PLAYER_STATE_MEMBERS //Knightmare added
+#if !KINGPIN //def NEW_PLAYER_STATE_MEMBERS //Knightmare added
 	if (pflags & PS_WEAPONSKIN)
 		MSG_WriteShort (msg, ps->gunskin);
 
@@ -461,6 +550,7 @@ void SV_WritePlayerstateToClient (client_frame_t *from, client_frame_t *to, size
 	}
 	if (pflags & PS_FOV)
 		MSG_WriteByte (msg, ps->fov);
+
 	if (pflags & PS_RDFLAGS)
 		MSG_WriteByte (msg, ps->rdflags);
 

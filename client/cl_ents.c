@@ -241,6 +241,7 @@ Can go from either a baseline or a previous packet_entity
 */
 void CL_ParseDelta (entity_state_t *from, entity_state_t *to, int number, int bits)
 {
+
 	// set everything to the state we are delta'ing from
 	*to = *from;
 
@@ -253,13 +254,48 @@ void CL_ParseDelta (entity_state_t *from, entity_state_t *to, int number, int bi
 	{
 		if (bits & U_MODEL)
 			to->modelindex = MSG_ReadByte (&net_message);
+#if !KINGPIN
 		if (bits & U_MODEL2)
 			to->modelindex2 = MSG_ReadByte (&net_message);
 		if (bits & U_MODEL3)
 			to->modelindex3 = MSG_ReadByte (&net_message);
 		if (bits & U_MODEL4)
 			to->modelindex4 = MSG_ReadByte (&net_message);
-			
+#endif	
+#if KINGPIN
+	if (bits & U_NUMPARTS)
+		to->num_parts = MSG_ReadByte (&net_message);
+	if (bits & U_MODELPARTS)
+	{
+		int a, c = 0;
+		c = MSG_ReadByte (&net_message);
+
+		for (a = 0; a < MAX_MODEL_PARTS; a++)
+		{
+			int tmp1 = (1 << a);
+			if (c & tmp1)
+			{
+				int c2 = MSG_ReadByte (&net_message);
+				if (c2 & 1)
+					to->model_parts[a].modelindex = MSG_ReadByte (&net_message);
+				if (c2 & 2)
+					to->model_parts[a].invisible_objects = MSG_ReadByte  (&net_message);
+				if (c2 & 4)
+				{
+					int a2;
+					int c3 = MSG_ReadByte (&net_message);
+					for (a2 = 0; a2 < MAX_MODEL_PARTS; a2++)
+						if (c3 & (1 << a2))
+							to->model_parts[a].skinnum[a2] = MSG_ReadByte (&net_message);
+				}
+			}
+		}
+	}
+	if (bits & U_PART3MODEL)
+		to->model_parts[3].modelindex = MSG_ReadByte (&net_message);
+#endif //end KINGPIN
+
+
 		if (bits & U_FRAME8)
 			to->frame = MSG_ReadByte (&net_message);
 		if (bits & U_FRAME16)
@@ -271,6 +307,7 @@ void CL_ParseDelta (entity_state_t *from, entity_state_t *to, int number, int bi
 			to->skinnum = MSG_ReadByte(&net_message);
 		else if (bits & U_SKIN16)
 			to->skinnum = MSG_ReadShort(&net_message);
+
 
 		if ( (bits & (U_EFFECTS8|U_EFFECTS16)) == (U_EFFECTS8|U_EFFECTS16) )
 			to->effects = MSG_ReadLong(&net_message);
@@ -286,13 +323,35 @@ void CL_ParseDelta (entity_state_t *from, entity_state_t *to, int number, int bi
 		else if (bits & U_RENDERFX16)
 			to->renderfx = MSG_ReadShort(&net_message);
 
-		if (bits & U_ORIGIN1)
-			to->origin[0] = MSG_ReadCoord (&net_message);
-		if (bits & U_ORIGIN2)
-			to->origin[1] = MSG_ReadCoord (&net_message);
-		if (bits & U_ORIGIN3)
-			to->origin[2] = MSG_ReadCoord (&net_message);
-			
+#if KINGPIN //hypov8 todo: ((int)((to->origin[0] - from->origin[0]) * 4 + 128))
+		if ((bits & (U_RENDERFX8|U_RENDERFX16)) == (U_RENDERFX8|U_RENDERFX16))
+			to->renderfx2 = MSG_ReadLong (&net_message);
+		else if (bits & U_RENDERFX8)
+			to->renderfx2 = MSG_ReadByte (&net_message);
+		else if (bits & U_RENDERFX16)
+			to->renderfx2 = MSG_ReadShort (&net_message);
+
+
+		if (bits & U_ORIGINDELTA)
+		{
+			if (bits & U_ORIGIN1)
+				to->origin[0] += (MSG_ReadByte(&net_message) - 128) / 4;// - 128) / 4
+			if (bits & U_ORIGIN2)
+				to->origin[1] += (MSG_ReadByte(&net_message)- 128) / 4;//  *0.25) - 128
+			if (bits & U_ORIGIN3)
+				to->origin[2] += (MSG_ReadByte(&net_message) - 128) / 4;
+		}
+		else
+#endif
+		{
+			if (bits & U_ORIGIN1)
+				to->origin[0] = MSG_ReadCoord(&net_message);
+			if (bits & U_ORIGIN2)
+				to->origin[1] = MSG_ReadCoord(&net_message);
+			if (bits & U_ORIGIN3)
+				to->origin[2] = MSG_ReadCoord(&net_message);
+		}
+
 		if (bits & U_ANGLE1)
 			to->angles[0] = MSG_ReadAngle(&net_message);
 		if (bits & U_ANGLE2)
@@ -301,10 +360,24 @@ void CL_ParseDelta (entity_state_t *from, entity_state_t *to, int number, int bi
 			to->angles[2] = MSG_ReadAngle(&net_message);
 
 		if (bits & U_OLDORIGIN)
+#if KINGPIN
+		{
+			to->old_origin[0] = MSG_ReadCoord(&net_message);
+			to->old_origin[1] = MSG_ReadCoord(&net_message);
+			to->old_origin[2] = MSG_ReadCoord(&net_message);
+		}
+#else
 			MSG_ReadPos (&net_message, to->old_origin);
+#endif
 
 		if (bits & U_SOUND)
+#if !KINGPIN
+			to->sound = MSG_ReadShort (&net_message);
+#else
 			to->sound = MSG_ReadByte (&net_message);
+		else if (bits & U_SOUND16)
+			to->sound = MSG_ReadShort (&net_message);
+#endif
 
 		if (bits & U_EVENT)
 			to->event = MSG_ReadByte (&net_message);
@@ -313,8 +386,30 @@ void CL_ParseDelta (entity_state_t *from, entity_state_t *to, int number, int bi
 
 		if (bits & U_SOLID)
 			to->solid = MSG_ReadShort (&net_message);
-		// end old CL_ParseDelta code
+
+#if KINGPIN //hypov8 todo: scale float
+		if (bits & U_SCALE) 
+			to->scale = (MSG_ReadByte (&net_message)/ 127) -1 ;
+
+		if (bits & U_MODELLIGHT)
+		{
+			int c = MSG_ReadLong(&net_message);
+			int o1 = c << (0 * 10);
+			int o2 = c >> (0 * 10);
+			int o3 = c >> (1 * 10);
+			/*to->model_lighting.light_indexes[0] = c <<(0 *10);
+			to->model_lighting.light_indexes[1] = c <<(1 *10);
+			to->model_lighting.light_indexes[2] = c <<(2 *10);*/
+			to->model_lighting.light_indexes[0] = (((1 << 10) - 1) & (c >> (0*10)));
+			to->model_lighting.light_indexes[1] = (((1 << 10) - 1) & (c >> (1*10)));
+			to->model_lighting.light_indexes[2] = (((1 << 10) - 1) & (c >> (2*10)));
+
+		}
+#endif
+
+	// end old CL_ParseDelta code
 	}	
+#if !KINGPIN //hypov8
 	else //new CL_ParseDelta code
 	{
 	#ifndef NEW_ENTITY_STATE_MEMBERS
@@ -331,6 +426,7 @@ void CL_ParseDelta (entity_state_t *from, entity_state_t *to, int number, int bi
 			to->modelindex4 = MSG_ReadShort (&net_message);
 
 	// 1/18/2002- extra model indices
+
 	#ifdef NEW_ENTITY_STATE_MEMBERS
 		if (bits & U_MODEL5)
 			to->modelindex5 = MSG_ReadShort (&net_message);
@@ -342,6 +438,7 @@ void CL_ParseDelta (entity_state_t *from, entity_state_t *to, int number, int bi
 		if (bits & U_MODEL6)
 			ignore = MSG_ReadShort (&net_message);
 	#endif // NEW_ENTITY_STATE_MEMBERS
+
 		if (bits & U_FRAME8)
 			to->frame = MSG_ReadByte (&net_message);
 		if (bits & U_FRAME16)
@@ -374,6 +471,7 @@ void CL_ParseDelta (entity_state_t *from, entity_state_t *to, int number, int bi
 			to->origin[1] = MSG_ReadCoord (&net_message);
 		if (bits & U_ORIGIN3)
 			to->origin[2] = MSG_ReadCoord (&net_message);
+
 			
 		if (bits & U_ANGLE1)
 			to->angles[0] = MSG_ReadAngle(&net_message);
@@ -396,14 +494,14 @@ void CL_ParseDelta (entity_state_t *from, entity_state_t *to, int number, int bi
 		// 12/23/2001- read sound indices as shorts
 		if (bits & U_SOUND)
 			to->sound = MSG_ReadShort (&net_message);
-		
+	
 	#ifdef LOOP_SOUND_ATTENUATION
 		if (bits & U_ATTENUAT)
-	#ifdef NEW_ENTITY_STATE_MEMBERS
+		#ifdef NEW_ENTITY_STATE_MEMBERS
 			to->attenuation = MSG_ReadByte (&net_message) / 64.0;
-	#else // we need to read and ignore this for eraser client compatibility
+		#else // we need to read and ignore this for eraser client compatibility
 			ignore = MSG_ReadByte (&net_message) / 64.0;
-	#endif
+		#endif
 	#endif
 
 		if (bits & U_EVENT)
@@ -415,6 +513,7 @@ void CL_ParseDelta (entity_state_t *from, entity_state_t *to, int number, int bi
 			to->solid = MSG_ReadShort (&net_message);
 
 	}	//end new CL_ParseDelta code
+	#endif
 }
 
 /*
@@ -497,6 +596,7 @@ void CL_ParsePacketEntities (frame_t *oldframe, frame_t *newframe)
 	int			bits;
 	entity_state_t	*oldstate;
 	int			oldindex, oldnum;
+		int countr=0; //hypov8 add:
 
 	newframe->parse_entities = cl.parse_entities;
 	newframe->num_entities = 0;
@@ -518,7 +618,12 @@ void CL_ParsePacketEntities (frame_t *oldframe, frame_t *newframe)
 
 	while (1)
 	{
+
 		newnum = CL_ParseEntityBits (&bits);
+
+		countr++; //hypov8 add:
+		//Com_Printf ("   ent# %i, c# %i, bit %i\n",newnum, countr, bits);
+
 		if (newnum >= MAX_EDICTS)
 			Com_Error (ERR_DROP,"CL_ParsePacketEntities: bad number:%i", newnum);
 
@@ -531,12 +636,12 @@ void CL_ParsePacketEntities (frame_t *oldframe, frame_t *newframe)
 		while (oldnum < newnum)
 		{	// one or more entities from the old packet are unchanged
 			if (cl_shownet->value == 3)
-				Com_Printf ("   unchanged: %i\n", oldnum);
+				Com_Printf ("   unchanged1: %i\n", oldnum);
 			CL_DeltaEntity (newframe, oldnum, oldstate, 0);
 			
 			oldindex++;
 
-			if (oldindex >= oldframe->num_entities)
+			if (!oldframe || oldindex >= oldframe->num_entities) //hypov8 add: !oldframe. can be null
 				oldnum = 99999;
 			else
 			{
@@ -554,7 +659,7 @@ void CL_ParsePacketEntities (frame_t *oldframe, frame_t *newframe)
 
 			oldindex++;
 
-			if (oldindex >= oldframe->num_entities)
+			if (!oldframe || oldindex >= oldframe->num_entities) //hypov8 add: !oldframe. can be null
 				oldnum = 99999;
 			else
 			{
@@ -596,7 +701,7 @@ void CL_ParsePacketEntities (frame_t *oldframe, frame_t *newframe)
 	while (oldnum != 99999)
 	{	// one or more entities from the old packet are unchanged
 		if (cl_shownet->value == 3)
-			Com_Printf ("   unchanged: %i\n", oldnum);
+			Com_Printf ("   unchanged2: %i\n", oldnum);
 		CL_DeltaEntity (newframe, oldnum, oldstate, 0);
 		
 		oldindex++;
@@ -686,7 +791,11 @@ void CL_ParsePlayerstate (frame_t *oldframe, frame_t *newframe)
 		{
 			state->viewoffset[0] = MSG_ReadChar (&net_message) * 0.25;
 			state->viewoffset[1] = MSG_ReadChar (&net_message) * 0.25;
+#if KINGPIN
+			state->viewoffset[2] = MSG_ReadAngle16 (&net_message);
+#else
 			state->viewoffset[2] = MSG_ReadChar (&net_message) * 0.25;
+#endif
 		}
 
 		if (flags & PS_VIEWANGLES)
@@ -706,18 +815,65 @@ void CL_ParsePlayerstate (frame_t *oldframe, frame_t *newframe)
 		if (flags & PS_WEAPONINDEX)
 		{
 			state->gunindex = MSG_ReadByte (&net_message);
+#if KINGPIN
+			{
+				int a;
+				int c= MSG_ReadByte (&net_message);
+
+				for (a = 0; a < MAX_MODEL_PARTS; a++)
+				{
+					int tmp1 = (1 << a);
+					if (c & tmp1)
+					{
+						int c2 = MSG_ReadByte (&net_message);
+						if (c2 & 1)
+							state->model_parts[a].modelindex = MSG_ReadByte (&net_message);
+						if (c2 & 2)
+							state->model_parts[a].invisible_objects = MSG_ReadByte  (&net_message);
+						if (c2 & 4)
+						{
+							int a2;
+							int c3 = MSG_ReadByte (&net_message);
+							for (a2 = 0; a2 < MAX_MODEL_PARTS; a2++)
+								if (c3 & (1 << a2))
+									state->model_parts[a].skinnum[a2] = MSG_ReadByte (&net_message);
+						}
+					}
+				}
+			}
+#endif
 		}
 
 		if (flags & PS_WEAPONFRAME)
 		{
 			state->gunframe = MSG_ReadByte (&net_message);
+#if !KINGPIN
 			state->gunoffset[0] = MSG_ReadChar (&net_message)*0.25;
 			state->gunoffset[1] = MSG_ReadChar (&net_message)*0.25;
 			state->gunoffset[2] = MSG_ReadChar (&net_message)*0.25;
 			state->gunangles[0] = MSG_ReadChar (&net_message)*0.25;
 			state->gunangles[1] = MSG_ReadChar (&net_message)*0.25;
 			state->gunangles[2] = MSG_ReadChar (&net_message)*0.25;
+#endif
 		}
+
+#if KINGPIN //hypov8 todo: what uses this??
+		//if (flags & PS_GUNOFFSET)
+		if (flags & PS_WEAPONFRAME) //hypov8 ??
+		{
+			state->gunoffset[0]= 	MSG_ReadChar (&net_message)*0.25;
+			state->gunoffset[1]= 	MSG_ReadChar (&net_message)*0.25;
+			state->gunoffset[2]= 	MSG_ReadChar (&net_message)*0.25;
+		}
+
+		//	if (extraflags & EPS_GUNANGLES)
+		if (flags & PS_WEAPONFRAME) //hypov8 ??
+		{
+			state->gunangles[0]= 	MSG_ReadChar (&net_message)*0.25;
+			state->gunangles[1]= 	MSG_ReadChar (&net_message)*0.25;
+			state->gunangles[2]= 	MSG_ReadChar (&net_message)*0.25;
+		}
+#endif
 
 		if (flags & PS_BLEND)
 		{
@@ -738,7 +894,9 @@ void CL_ParsePlayerstate (frame_t *oldframe, frame_t *newframe)
 		for (i = 0; i < OLD_MAX_STATS; i++) //Knightmare- use old max_stats
 			if (statbits & (1<<i) )
 				state->stats[i] = MSG_ReadShort(&net_message);
-	}	//end old CL_ParsePlayerstate code
+	}	//end KINGPIN
+	//end old CL_ParsePlayerstate code
+#if !KINGPIN
 	else //new CL_ParsePlayerstate code
 	{
 		// Knightmare 4/5/2002- read as long
@@ -817,19 +975,25 @@ void CL_ParsePlayerstate (frame_t *oldframe, frame_t *newframe)
 		if (flags & PS_WEAPONINDEX)
 			state->gunindex = MSG_ReadShort (&net_message);
 
-	#ifdef NEW_PLAYER_STATE_MEMBERS	// Knightmare- gunindex2 support
+	#if !KINGPIN //def NEW_PLAYER_STATE_MEMBERS	// Knightmare- gunindex2 support
 		if (flags & PS_WEAPONINDEX2)
 			state->gunindex2 = MSG_ReadShort (&net_message);
 	#endif
 
 	// Knightmare- gunframe2 support
 	#ifdef NEW_PLAYER_STATE_MEMBERS
-		if ((flags & PS_WEAPONFRAME) || (flags & PS_WEAPONFRAME2))
+		if ((flags & PS_WEAPONFRAME) 
+#if  !KINGPIN //
+			|| (flags & PS_WEAPONFRAME2)
+#endif
+			)
 		{
 			if (flags & PS_WEAPONFRAME)
 				state->gunframe = MSG_ReadByte (&net_message);
+#if !KINGPIN //
 			if (flags & PS_WEAPONFRAME2)
 				state->gunframe2 = MSG_ReadByte (&net_message);
+#endif
 			state->gunoffset[0] = MSG_ReadChar (&net_message)*0.25;
 			state->gunoffset[1] = MSG_ReadChar (&net_message)*0.25;
 			state->gunoffset[2] = MSG_ReadChar (&net_message)*0.25;
@@ -850,7 +1014,7 @@ void CL_ParsePlayerstate (frame_t *oldframe, frame_t *newframe)
 		}
 	#endif
 
-	#ifdef NEW_PLAYER_STATE_MEMBERS
+	#if !KINGPIN //def NEW_PLAYER_STATE_MEMBERS
 		if (flags & PS_WEAPONSKIN)	// Knightmare- gunskin support
 			state->gunskin = MSG_ReadShort (&net_message);
 
@@ -894,6 +1058,7 @@ void CL_ParsePlayerstate (frame_t *oldframe, frame_t *newframe)
 			if (statbits & (1<<i) )
 				state->stats[i] = MSG_ReadShort(&net_message);
 	} //end new CL_ParsePlayerstate code
+#endif
 }
 
 
@@ -1090,7 +1255,7 @@ struct model_s *S_RegisterSexedModel (entity_state_t *ent, char *base)
 	mdl = R_RegisterModel(buffer);
 	if (!mdl) {
 		// not found, try default weapon model
-		Com_sprintf (buffer, sizeof(buffer), "players/%s/weapon.md2", model);
+		Com_sprintf (buffer, sizeof(buffer), "players/%s/w_pipe.mdx", model);
 		mdl = R_RegisterModel(buffer);
 		if (!mdl) {
 			// no, revert to the male model
@@ -1098,7 +1263,7 @@ struct model_s *S_RegisterSexedModel (entity_state_t *ent, char *base)
 			mdl = R_RegisterModel(buffer);
 			if (!mdl) {
 				// last try, default male weapon.md2
-				Com_sprintf (buffer, sizeof(buffer), "players/male/weapon.md2");
+				Com_sprintf (buffer, sizeof(buffer), "players/male_thug/w_pipe.mdx"); //KINGPIN
 				mdl = R_RegisterModel(buffer);
 			}
 		} 
@@ -1106,6 +1271,7 @@ struct model_s *S_RegisterSexedModel (entity_state_t *ent, char *base)
 
 	return mdl;
 }
+
 
 // Knightmare- save off current player weapon model for player config menu
 extern	char	*currentweaponmodel;
@@ -1120,13 +1286,19 @@ CL_AddPacketEntities
 void CL_AddPacketEntities (frame_t *frame)
 {
 	entity_t			ent;
+#if KINGPIN
+	qboolean			useMDX;
+	qboolean			useMDXPPM;
+	//entity_t			ent2;
+	//entity_t			ent3;
+#endif
 	entity_state_t		*s1;
 	float				autorotate;
 	int					i;
 	int					pnum;
 	centity_t			*cent;
 	int					autoanim;
-	clientinfo_t		*ci;
+	clientinfo_t		*ci, *ci2;
 	unsigned int		effects, renderfx;
 
 	// bonus items rotate at a fixed rate
@@ -1147,6 +1319,13 @@ void CL_AddPacketEntities (frame_t *frame)
 	{
 		qboolean isclientviewer = false;
 		qboolean drawEnt = true; //Knightmare added
+		player_state_t	*state;
+		state = &frame->playerstate;
+
+ #if KINGPIN
+		useMDX = false; //
+		useMDXPPM = false; //
+#endif
 
 		s1 = &cl_parse_entities[(frame->parse_entities+pnum)&(MAX_PARSE_ENTITIES-1)];
 
@@ -1236,52 +1415,33 @@ void CL_AddPacketEntities (frame_t *frame)
 		}
 		else
 		{
-			// set skin
-			if ( s1->modelindex == MAX_MODELS-1 //was 255
-				//Knightmare- GROSS HACK for old demos, use modelindex 255
-				|| ( LegacyProtocol() && s1->modelindex == OLD_MAX_MODELS-1 ) )
-			{	// use custom player skin
+			// player model. head
+			if (s1->modelindex == 255)
+			{
 				ent.skinnum = 0;
-				ci = &cl.clientinfo[s1->skinnum & 0xff];
-				ent.skin = ci->skin;
-				ent.model = ci->model;
-				if (!ent.skin || !ent.model)
-				{
-					ent.skin = cl.baseclientinfo.skin;
-					ent.model = cl.baseclientinfo.model;
-				}
 
-//============
-//PGM
-				if (renderfx & RF_USE_DISGUISE)
-				{
-					if(!strncmp((char *)ent.skin, "players/male", 12))
-					{
-						ent.skin = R_RegisterSkin ("players/male/disguise.pcx");
-						ent.model = R_RegisterModel ("players/male/tris.md2");
-					}
-					else if(!strncmp((char *)ent.skin, "players/female", 14))
-					{
-						ent.skin = R_RegisterSkin ("players/female/disguise.pcx");
-						ent.model = R_RegisterModel ("players/female/tris.md2");
-					}
-					else if(!strncmp((char *)ent.skin, "players/cyborg", 14))
-					{
-						ent.skin = R_RegisterSkin ("players/cyborg/disguise.pcx");
-						ent.model = R_RegisterModel ("players/cyborg/tris.md2");
-					}
-				}
-//PGM
-//============
+				ci = &cl.clientinfo[s1->skinnum & 0xff];
+				//head
+				ent.model = ci->model[0];  
+				ent.skin = ci->skin[0];
+#if KINGPIN
+				useMDXPPM = true;
 			}
+			else if (s1->num_parts)
+			{
+				//draw later..
+				drawEnt = false;
+			}
+#endif
 			else
 			{
+				//map models
 				ent.skinnum = s1->skinnum;
 				ent.skin = NULL;
 				ent.model = cl.model_draw[s1->modelindex];
 			}
 		}
-		
+#if !KINGPIN		
 		//**** MODEL / EFFECT SWAPPING ETC *** - per gametype...
 		if (ent.model)
 		{
@@ -1316,7 +1476,7 @@ void CL_AddPacketEntities (frame_t *frame)
 				drawEnt = false;
 			}
 		}
-
+#endif
 		// only used for black hole model right now, FIXME: do better
 		if (renderfx & RF_TRANSLUCENT)
 			ent.alpha = 0.70;
@@ -1381,6 +1541,7 @@ void CL_AddPacketEntities (frame_t *frame)
 				else
 					V_AddLight (ent.origin, 225, 1.0, 0.1, 0.1);
 			}
+#if !KINGPIN
 			else if (effects & EF_FLAG2)
 				V_AddLight (ent.origin, 225, 0.1, 0.1, 1.0);
 			else if (effects & EF_TAGTRAIL)						//PGM
@@ -1398,7 +1559,7 @@ void CL_AddPacketEntities (frame_t *frame)
 					i = 0;
 				currentweaponmodel = cl_weaponmodels[i];
 			}
-
+#endif
 		//	if (!cg_thirdperson->value)
 			// fix for third-person in demos
 			if ( !(cg_thirdperson->value
@@ -1407,7 +1568,10 @@ void CL_AddPacketEntities (frame_t *frame)
 		}
 
 		// if set to invisible, skip
-		if (!s1->modelindex)
+		if (!s1->modelindex 
+#if KINGPIN
+			&& !s1->num_parts)
+#endif
 			continue;
 
 		if (effects & EF_BFG)
@@ -1450,13 +1614,71 @@ void CL_AddPacketEntities (frame_t *frame)
 			ent.flags |= RF_MIRRORMODEL;
 
 		// if set to invisible, skip
-		if (!s1->modelindex)
+		if (!s1->modelindex 
+#if KINGPIN
+			&& !s1->num_parts) //hypov8 todo: allways visable
+#endif
 			continue;
 
 		// add to refresh list
 		if (drawEnt) //Knightmare added
 			V_AddEntity (&ent);
 
+		if (useMDXPPM)
+		{	
+			//body
+			ent.model = ci->model[1];
+			ent.skin = ci->skin[1];
+			if (ent.model) 
+				V_AddEntity(&ent);
+			//legs
+			ent.model = ci->model[2];
+			ent.skin = ci->skin[2];
+			if (ent.model) 
+				V_AddEntity(&ent);
+			//weapon
+			if (s1->model_parts[3].modelindex == 255)
+			{
+				ci = &cl.clientinfo[s1->skinnum & 0xff];
+				i = (s1->skinnum >> 8) -1; // Kingpin Player weapon number
+				if (!cl_vwep->value || i > MAX_CLIENTWEAPONMODELS - 1)
+					i = 0;
+				ent.model = ci->weaponmodel[i];
+				if (!ent.model) 
+				{
+					if (i != 0)
+						ent.model = ci->weaponmodel[0];
+					if (!ent.model)
+						ent.model = cl.baseclientinfo.weaponmodel[0];
+				}
+			}
+			//hypov8 todo: extras...
+
+
+			// PMM - check for the defender sphere shell .. make it translucent
+			// replaces the previous version which used the high bit on modelindex2 to determine transparency
+			/*if (!Q_strcasecmp (cl.configstrings[CS_MODELS+(s1->modelindex2)], "models/items/shell/tris.md2"))
+			{
+				ent.alpha = 0.32;
+				ent.flags = RF_TRANSLUCENT;
+			}*/
+			// pmm
+
+			// Knightmare added for Psychospaz's chasecam
+			if (isclientviewer)
+				ent.flags |= RF_VIEWERMODEL;
+
+			// Knightmare added for mirroring
+			if (renderfx & RF_MIRRORMODEL)
+				ent.flags |= RF_MIRRORMODEL;
+
+			V_AddEntity (&ent);
+
+			//PGM - make sure these get reset.
+			ent.flags = 0;
+			ent.alpha = 1.0F;
+			//PGM
+		}
 
 		// color shells generate a seperate entity for the main model
 		if (effects & EF_COLOR_SHELL && (!isclientviewer || (cg_thirdperson->value
@@ -1505,53 +1727,180 @@ void CL_AddPacketEntities (frame_t *frame)
 		ent.flags = 0;
 		ent.alpha = 1.0F;
 
-		// duplicate for linked models
-		if (s1->modelindex2)
+#if KINGPIN
+		if (s1->num_parts) //hypov8 add: player/multi mdx models. ok?
 		{
-			if (s1->modelindex2 == MAX_MODELS-1
-				//Knightmare- GROSS HACK for old demos, use modelindex 255
-				|| ( LegacyProtocol() && s1->modelindex2 == OLD_MAX_MODELS-1 ) )
-			{	// custom weapon
-				ci = &cl.clientinfo[s1->skinnum & 0xff];
-				i = (s1->skinnum >> 8); // 0 is default weapon model
-				if (!cl_vwep->value || i > MAX_CLIENTWEAPONMODELS - 1)
-					i = 0;
-				ent.model = ci->weaponmodel[i];
-				if (!ent.model) {
-					if (i != 0)
-						ent.model = ci->weaponmodel[0];
-					if (!ent.model)
-						ent.model = cl.baseclientinfo.weaponmodel[0];
-				}
-			}
-			else
-				ent.model = cl.model_draw[s1->modelindex2];
-
-			// PMM - check for the defender sphere shell .. make it translucent
-			// replaces the previous version which used the high bit on modelindex2 to determine transparency
-			if (!Q_strcasecmp (cl.configstrings[CS_MODELS+(s1->modelindex2)], "models/items/shell/tris.md2"))
+			int x;
+			for (x = 0; x < MAX_MODEL_PARTS; x++)
 			{
-				ent.alpha = 0.32;
-				ent.flags = RF_TRANSLUCENT;
+				if (s1->model_parts[x].invisible_objects & 1 ||s1->model_parts[x].invisible_objects & 2)
+					continue;
+
+				//assign a model
+				if (!s1->model_parts[x].modelindex)
+					continue;
+				ent.model = cl.model_draw[s1->model_parts[x].modelindex];
+				if (!ent.model)
+					continue;
+
+				ent.skin = NULL;
+				ent.skinnum = 0;
+				//ent.flags = 0;
+				//ent.alpha = 1.0F;
+
+				//assign a skins. CS_MODELSKINS
+				if (x == 0 || x == 1 || x == 2) 
+				{//	 head      legs      body
+					/*for (i = 0; i < MAX_MODEL_PARTS; i++)*/ //hypov8 todo: mdx objects
+					qboolean changeSkin = false;
+					char *painSkinType = "";
+					char modelString[64], skinStriped[64];
+					char skinIndex[32];
+					int baseSkin = s1->model_parts[x].baseskin;
+					int painSkin = s1->model_parts[x].skinnum[0]; //hypov8 todo: mdx objects
+					int curSkin = s1->model_parts[x].currentSkin[0]; //hypov8 todo: mdx objects
+					//int skinId = s1->model_parts[x].oldSkinIndex;
+
+					//check for new skin. store it
+					if (baseSkin == 0) //|| baseSkin != painSkin
+					{
+						baseSkin = s1->model_parts[x].skinnum[0] - (s1->model_parts[x].skinnum[0] % 3);
+						s1->model_parts[x].baseskin = baseSkin+1; //index 0 unused..
+					}
+					else
+						baseSkin -= 1; //shift index back to 0
+
+					//use pain skin?
+					if (curSkin != painSkin)
+					{
+						if (s1->model_parts[x].skinnum[0] % 3 == 1)		//001p1.tga
+							painSkinType = "p1";
+						else if (s1->model_parts[x].skinnum[0] % 3 == 2)//001p2.tga
+							painSkinType = "p2";
+					}
+					else	//use old skin //if(s1->model_parts[x].oldSkin)	
+						ent.skin = s1->model_parts[x].oldSkin;			
+
+					s1->model_parts[x].currentSkin[0] = painSkin;
+
+					//inital loading of model..							
+					if (!ent.skin)
+					{		
+						char strSkin[MAX_QPATH];
+
+						//get model name
+						strcpy(modelString, cl.configstrings[CS_MODELS + s1->model_parts[x].modelindex]);
+
+						//cl.model_draw[s1->model_parts[x].modelindex].name;
+						COM_StripExtension(modelString, skinStriped);
+
+						if (painSkin == 0 && !strstr(modelString, "/rat/") &&!strstr(modelString, "/dog/") &&!strstr(modelString, "/enemy_dog/") )
+							painSkin = painSkin;
+
+						strcpy(skinIndex, cl.configstrings[CS_MODELSKINS + s1->model_parts[x].modelindex]+baseSkin);
+						skinIndex[3] = 0;
+
+						//hypov8 todo: pain skins & limbs removed
+						//
+
+						if (!Q_strncasecmp("models/actors/", skinStriped, 14))
+						{
+							ent.skinnum = 0;
+							if (strstr(skinStriped, "/shorty/") ||strstr(skinStriped, "/runt/"))
+							{
+								char *sArrayRunt[3] = { "runt/head", "thug/legs", "runt/body_"};
+								Com_sprintf(strSkin, sizeof(strSkin), "%s_%s%s.tga", skinStriped, skinIndex, painSkinType); 
+								ent.skin = R_RegisterSkin(strSkin); // hypov8 todo: skin regester every frame?
+								if (!ent.skin){
+									Com_sprintf(strSkin, sizeof(strSkin), "%s_%s.tga", skinStriped, skinIndex); //no pain skins
+									ent.skin = R_RegisterSkin(strSkin);
+									if (!ent.skin)	{
+										Com_sprintf(strSkin, sizeof(strSkin), "models/actors/%s_%s%s.tga", sArrayRunt[x], skinIndex, painSkinType);
+										ent.skin = R_RegisterSkin(strSkin);
+										if (!ent.skin)	{
+											Com_sprintf(strSkin, sizeof(strSkin), "models/actors/%s_%s.tga", sArrayRunt[x], skinIndex); //no pain skins
+											ent.skin = R_RegisterSkin(strSkin);
+										}
+									}
+								}
+							}
+							else if ( strstr(skinStriped, "/thug/") ||strstr(skinStriped, "/punk/") ||strstr(skinStriped, "/bum_sit/")||strstr(skinStriped, "/thug_sit/"))
+							{
+								char *sArrayThug[3] = { "/thug/head", "thug/legs", "thug/body",};
+								Com_sprintf(strSkin, sizeof(strSkin), "%s_%s%s.tga", skinStriped, skinIndex, painSkinType); 
+								ent.skin = R_RegisterSkin(strSkin);
+								if (!ent.skin){
+									Com_sprintf(strSkin, sizeof(strSkin), "%s_%s.tga", skinStriped, skinIndex); //no pain skins
+									ent.skin = R_RegisterSkin(strSkin); 
+									if (!ent.skin){
+										Com_sprintf(strSkin, sizeof(strSkin), "models/actors/%s_%s%s.tga", sArrayThug[x], skinIndex, painSkinType);
+										ent.skin = R_RegisterSkin(strSkin);
+										if (!ent.skin)	{
+											Com_sprintf(strSkin, sizeof(strSkin), "models/actors/%s_%s.tga", sArrayThug[x], skinIndex); //no pain skins
+											ent.skin = R_RegisterSkin(strSkin);
+										}
+									}
+								}
+							}
+							else if (strstr(skinStriped, "/whore/")|| strstr(skinStriped, "/bitch/"))
+							{
+								char *sArrayBitch[3] = { "bitch/head", "bitch/legs", "bitch/body" };
+								Com_sprintf(strSkin, sizeof(strSkin), "%s_%s%s.tga", skinStriped, skinIndex, painSkinType); 
+								ent.skin = R_RegisterSkin(strSkin); // hypov8 todo: skin regester every frame?
+								if (!ent.skin){
+									Com_sprintf(strSkin, sizeof(strSkin), "%s_%s.tga", skinStriped, skinIndex); //no pain skins
+									ent.skin = R_RegisterSkin(strSkin); // hypov8 todo: skin regester every frame?
+									if (!ent.skin){
+										Com_sprintf(strSkin, sizeof(strSkin), "models/actors/%s_%s%s.tga", sArrayBitch[x], skinIndex, painSkinType);
+										ent.skin = R_RegisterSkin(strSkin);
+										if (!ent.skin)	{
+											Com_sprintf(strSkin, sizeof(strSkin), "models/actors/%s_%s.tga", sArrayBitch[x], skinIndex); //no pain skins
+											ent.skin = R_RegisterSkin(strSkin);
+										}
+									}
+								}
+							}
+							else	//rat. dog etc..
+							{
+								Com_sprintf(strSkin, sizeof(strSkin), "%s_%s%s.tga", skinStriped, skinIndex, painSkinType); 
+								ent.skin = R_RegisterSkin(strSkin); // hypov8 todo: skin regester every frame?
+								if (!ent.skin){
+									Com_sprintf(strSkin, sizeof(strSkin), "%s_%s.tga", skinStriped, skinIndex); //no pain skins
+									ent.skin = R_RegisterSkin(strSkin); // hypov8 todo: skin regester every frame?
+									if (!ent.skin){
+
+										//ent.skin = cl.model_draw[s1->model_parts[x].modelindex]->skins[0][s1->model_parts[x].skinnum[0]];
+
+										ent.skinnum = s1->model_parts[x].skinnum;
+									}
+								}
+							}
+						}
+					}
+					if (ent.skin)
+						s1->model_parts[x].oldSkin = ent.skin;
+
+				}
+				else  //use internal skin?
+				{
+					ent.skin = s1->model_parts[x].oldSkin;
+					if (!ent.skin)
+						ent.skin = R_RegisterSkin(cl.configstrings[CS_MODELSKINS + s1->model_parts[x].modelindex]);
+					if (ent.skin)
+						s1->model_parts[x].oldSkin = ent.skin;
+				}
+
+				ent.skinnum = 0; // (int)cent->current.model_parts[x].skinnum[0]; //more then 1 skin?
+				V_AddEntity(&ent);
+
+				//reset
+				ent.skin = NULL;
 			}
-			// pmm
-
-			// Knightmare added for Psychospaz's chasecam
-			if (isclientviewer)
-				ent.flags |= RF_VIEWERMODEL;
-
-			// Knightmare added for mirroring
-			if (renderfx & RF_MIRRORMODEL)
-				ent.flags |= RF_MIRRORMODEL;
-
-			V_AddEntity (&ent);
-
-			//PGM - make sure these get reset.
-			ent.flags = 0;
-			ent.alpha = 1.0F;
-			//PGM
 		}
 
+#endif //END KINGPIN
+
+#if 0
 		if (s1->modelindex3)
 		{
 			// Knightmare added for Psychospaz's chasecam
@@ -1606,6 +1955,7 @@ void CL_AddPacketEntities (frame_t *frame)
 			ent.model = cl.model_draw[s1->modelindex6];
 			V_AddEntity (&ent);
 		}
+#endif
 #endif
 		if ( effects & EF_POWERSCREEN )
 		{
@@ -1824,9 +2174,16 @@ void CL_AddViewWeapon (player_state_t *ps, player_state_t *ops)
 		gun.model = cl.model_draw[ps->gunindex];
 
 #ifdef NEW_PLAYER_STATE_MEMBERS //Knightmare- second gun model
+	#if KINGPIN
+	//gun2.model = cl.model_draw[ps->gunindex2];
+	if (!gun.model /*&& !gun2.model*/)
+		return;
+
+	#else
 	gun2.model = cl.model_draw[ps->gunindex2];
 	if (!gun.model && !gun2.model)
 		return;
+	#endif
 #else
 	if (!gun.model)
 		return;
@@ -1927,6 +2284,90 @@ void CL_AddViewWeapon (player_state_t *ps, player_state_t *ops)
 	}
 	//Knightmare- second gun model
 #ifdef NEW_PLAYER_STATE_MEMBERS
+#if KINGPIN
+	{
+		qboolean isMulti =false;
+
+		for (i = 0; i < MAX_MODEL_PARTS; i++){
+			if (ps->model_parts[i].modelindex > 0){
+				isMulti = true;
+				break;
+			}
+		}
+
+		if (isMulti)
+		{
+			// set up gun2 position
+			for (i=0 ; i<3 ; i++)
+			{
+				gun2.origin[i] = cl.refdef.vieworg[i] + ops->gunoffset[i]
+					+ cl.lerpfrac * (ps->gunoffset[i] - ops->gunoffset[i]);
+				gun2.angles[i] = cl.refdef.viewangles[i] + LerpAngle (ops->gunangles[i],
+					ps->gunangles[i], cl.lerpfrac);
+			}
+
+			gun2.frame = ps->gunframe;
+			if (gun2.frame == 0)
+				gun2.oldframe = 0;	// just changed weapons, don't lerp from old
+			else
+				gun2.oldframe = ops->gunframe;
+
+			for (i = 0; i < MAX_MODEL_PARTS; i++)
+			{
+				if (ps->model_parts[i].modelindex == 0)
+					continue;
+				if (ps->model_parts[i].invisible_objects & 1) //hypov8 todo: 1=? 2=? (seen 3)
+					continue;
+
+				gun2.model = cl.model_draw[ps->model_parts[i].modelindex];
+				if (!gun2.model)
+					continue;
+
+				if (ps->model_parts[i].skinnum[0]) //hypov8 todo: multi skin??
+					gun2.skinnum = ops->model_parts[i].skinnum[0];
+
+				gun2.flags = RF_MINLIGHT | RF_DEPTHHACK | RF_WEAPONMODEL;
+				gun2.backlerp = 1.0 - cl.lerpfrac;
+				VectorCopy(gun2.origin, gun2.oldorigin);	// don't lerp at all
+				V_AddEntity(&gun2);
+
+				//add shells for viewweaps (all of em!)
+				if (cl_weapon_shells->value)
+				{
+					int oldeffects = gun2.flags, pnum;
+					entity_state_t	*s1;
+
+					for (pnum = 0; pnum < cl.frame.num_entities; pnum++)
+						if ((s1 = &cl_parse_entities[(cl.frame.parse_entities + pnum)&(MAX_PARSE_ENTITIES - 1)])->number == cl.playernum + 1)
+						{
+							int effects = s1->renderfx;
+
+							//if (effects & (RF_SHELL_RED|RF_SHELL_BLUE|RF_SHELL_GREEN) || s1->effects&(EF_PENT|EF_QUAD))
+							if (s1->effects&(EF_PENT | EF_QUAD | EF_DOUBLE | EF_HALF_DAMAGE))
+							{
+								gun2.flags = 0;
+								if (s1->effects & EF_QUAD)
+									gun2.flags |= oldeffects | RF_TRANSLUCENT | RF_SHELL_BLUE;
+								if (s1->effects & EF_PENT)
+									gun2.flags |= oldeffects | RF_TRANSLUCENT | RF_SHELL_RED;
+								if (s1->effects & EF_DOUBLE && !(s1->effects&(EF_PENT | EF_QUAD)))
+									gun2.flags |= oldeffects | RF_TRANSLUCENT | RF_SHELL_DOUBLE;
+								if (s1->effects & EF_HALF_DAMAGE && !(s1->effects&(EF_PENT | EF_QUAD | EF_DOUBLE)))
+									gun2.flags |= oldeffects | RF_TRANSLUCENT | RF_SHELL_HALF_DAM;
+
+								gun2.flags |= RF_TRANSLUCENT;
+								gun2.alpha = 0.30;
+
+								V_AddEntity(&gun2);
+							}
+							break; // early termination
+						}
+					gun2.flags = oldeffects;
+				}
+			}
+		}
+	}
+#else
 	if (gun2.model)
 	{
 		// set up gun2 position
@@ -1980,37 +2421,13 @@ void CL_AddViewWeapon (player_state_t *ps, player_state_t *ops)
 						gun2.alpha = 0.30;
 											
 						V_AddEntity (&gun2);
-						/*if (s1->effects & EF_COLOR_SHELL && gun2.flags & (RF_SHELL_RED|RF_SHELL_BLUE|RF_SHELL_GREEN))
-						{
-							gun2.skin = R_RegisterSkin ("gfx/shell_generic.pcx");
-
-							V_AddEntity (&gun2);
-						}
-						
-						if (s1->effects & EF_PENT)
-						{
-							gun2.skin = R_RegisterSkin ("gfx/shell_generic.pcx");
-							gun2.flags = oldeffects | RF_TRANSLUCENT | RF_SHELL_RED;
-							V_AddLight (gun2.origin, 130, 1, 0.25, 0.25);
-							V_AddLight (gun2.origin, 100, 1, 0, 0);
-
-							V_AddEntity (&gun2);
-						}
-						if (s1->effects & EF_QUAD)
-						{
-							gun2.skin = R_RegisterSkin ("gfx/shell_generic.pcx");
-							gun2.flags = oldeffects | RF_TRANSLUCENT | RF_SHELL_BLUE;
-							V_AddLight (gun2.origin, 130, 0.25, 0.5, 1);
-							V_AddLight (gun2.origin, 100, 0, 0.25, 1);
-
-							V_AddEntity (&gun2);
-						}*/
 					}
 					break; // early termination
 				}
 			gun2.flags = oldeffects;
 		}
 	}
+#endif
 #endif
 }
 

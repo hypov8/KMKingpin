@@ -308,7 +308,7 @@ void mutant_melee (edict_t *self)
 // ATTACK
 //
 
-void mutant_jump_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void mutant_jump_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if (self->health <= 0)
 	{

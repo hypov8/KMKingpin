@@ -106,7 +106,7 @@ qboolean SV_SetPlayer (void)
 	if (s[0] >= '0' && s[0] <= '9')
 	{
 		idnum = atoi(Cmd_Argv(1));
-		if (idnum < 0 || idnum >= maxclients->value)
+		if (idnum < 0 || idnum >= (int)maxclients->value)
 		{
 			Com_Printf ("Bad client slot: %i\n", idnum);
 			return false;
@@ -123,7 +123,7 @@ qboolean SV_SetPlayer (void)
 	}
 
 	// check for a name match
-	for (i=0,cl=svs.clients ; i<maxclients->value; i++,cl++)
+	for (i=0,cl=svs.clients ; i<(int)maxclients->value; i++,cl++)
 	{
 		if (!cl->state)
 			continue;
@@ -566,8 +566,8 @@ void SV_GameMap_f (void)
 			// clear all the client inuse flags before saving so that
 			// when the level is re-entered, the clients will spawn
 			// at spawn points instead of occupying body shells
-			savedInuse = malloc(maxclients->value * sizeof(qboolean));
-			for (i=0,cl=svs.clients ; i<maxclients->value; i++,cl++)
+			savedInuse = malloc((int)maxclients->value * sizeof(qboolean));
+			for (i=0,cl=svs.clients ; i<(int)maxclients->value; i++,cl++)
 			{
 				savedInuse[i] = cl->edict->inuse;
 				cl->edict->inuse = false;
@@ -576,7 +576,7 @@ void SV_GameMap_f (void)
 			SV_WriteLevelFile ();
 
 			// we must restore these for clients to transfer over correctly
-			for (i=0,cl=svs.clients ; i<maxclients->value; i++,cl++)
+			for (i=0,cl=svs.clients ; i<(int)maxclients->value; i++,cl++)
 				cl->edict->inuse = savedInuse[i];
 			free (savedInuse);
 		}
@@ -754,7 +754,7 @@ void SV_Savegame_f (void)
 	if ( !dedicated->value && (!strcmp(Cmd_Argv(1), "quick") || !strcmp(Cmd_Argv(1), "quik")) )
 		R_GrabScreen();
 
-	if (maxclients->value == 1 && svs.clients[0].edict->client->ps.stats[STAT_HEALTH] <= 0)
+	if ((int)maxclients->value == 1 && svs.clients[0].edict->client->ps.stats[STAT_HEALTH] <= 0)
 	{
 		Com_Printf ("\nCan't savegame while dead!\n");
 		return;
@@ -786,6 +786,15 @@ void SV_Savegame_f (void)
 }
 
 //===============================================================
+
+#if KINGPIN
+void /*EXPORT*/ SV_SaveNewLevel(void)
+{
+	SV_WriteLevelFile ();
+	SV_WriteServerFile (true);
+	SV_CopySaveGame ("current", "save0");
+}
+#endif
 
 /*
 ==================
@@ -840,7 +849,7 @@ void SV_Status_f (void)
 
 	Com_Printf ("num score ping name            lastmsg address               qport \n");
 	Com_Printf ("--- ----- ---- --------------- ------- --------------------- ------\n");
-	for (i=0,cl=svs.clients ; i<maxclients->value; i++,cl++)
+	for (i=0,cl=svs.clients ; i<(int)maxclients->value; i++,cl++)
 	{
 		if (!cl->state)
 			continue;
@@ -905,7 +914,7 @@ void SV_ConSay_f(void)
 //	strncat(text, p);
 	Q_strncatz(text, p, sizeof(text));
 
-	for (j = 0, client = svs.clients; j < maxclients->value; j++, client++)
+	for (j = 0, client = svs.clients; j < (int)maxclients->value; j++, client++)
 	{
 		if (client->state != cs_spawned)
 			continue;
@@ -1065,7 +1074,7 @@ void SV_ServerRecord_f (void)
 	MSG_WriteLong (&buf, svs.spawncount);
 	// 2 means server demo
 	MSG_WriteByte (&buf, 2);	// demos are always attract loops
-	MSG_WriteString (&buf, Cvar_VariableString ("gamedir"));
+	MSG_WriteString (&buf, Cvar_VariableString ("gamedir")); //hypov8 todo:
 	MSG_WriteShort (&buf, -1);
 	// send full levelname
 	MSG_WriteString (&buf, sv.configstrings[CS_NAME]);

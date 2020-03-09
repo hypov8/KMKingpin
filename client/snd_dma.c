@@ -628,6 +628,7 @@ struct sfx_s *S_RegisterSexedSound (entity_state_t *ent, char *base)
 	char			model[MAX_QPATH];
 	char			sexedFilename[MAX_QPATH];
 	char			maleFilename[MAX_QPATH];
+	qboolean isFemale = false;
 
 	// determine what model the client is using
 	model[0] = 0;
@@ -655,7 +656,15 @@ struct sfx_s *S_RegisterSexedSound (entity_state_t *ent, char *base)
 	// if we can't figure it out, they're male
 	if (!model[0])
 	//	strncpy(model, "male");
+#if !KINGPIN
 		Q_strncpyz(model, "male", sizeof(model));
+#else
+		Q_strncpyz(model, "male_thug", sizeof(model));
+	if (Q_strncasecmp(model, "female_", 7) == 0)
+		isFemale = true;
+#endif
+
+
 
 	// see if we already know of the model specific sound
 	Com_sprintf (sexedFilename, sizeof(sexedFilename), "#players/%s/%s", model, base+1);
@@ -673,8 +682,16 @@ struct sfx_s *S_RegisterSexedSound (entity_state_t *ent, char *base)
 		}
 		else
 		{
+#if !KINGPIN
 			// no, revert to the male sound in the pak0.pak
 			Com_sprintf (maleFilename, sizeof(maleFilename), "player/%s/%s", "male", base+1);
+#else
+			// no, revert to the male sound in the pak0.pak sound/actors/male
+			if (isFemale)
+				Com_sprintf (maleFilename, sizeof(maleFilename), "actors/player/female/%s", base+1);
+			else
+				Com_sprintf (maleFilename, sizeof(maleFilename), "actors/player/male/%s", base+1);
+#endif
 			sfx = S_AliasName (sexedFilename, maleFilename);
 		}
 	}

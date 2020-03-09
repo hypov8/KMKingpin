@@ -460,7 +460,7 @@ void UI_RefreshMapList (maptype_t maptype)
 	memset( ui_svr_mapshotvalid, 0, sizeof( byte ) * ( ui_svr_nummaps + 1 ) );
 	// register null levelshot
 	if (ui_svr_mapshotvalid[ui_svr_nummaps] == M_UNSET) {	
-		if (R_DrawFindPic("/gfx/ui/noscreen.pcx"))
+		if (R_DrawFindPic(UI_NOSCREEN_NAME))
 			ui_svr_mapshotvalid[ui_svr_nummaps] = M_FOUND;
 		else
 			ui_svr_mapshotvalid[ui_svr_nummaps] = M_MISSING;
@@ -622,7 +622,7 @@ void StartServer_MenuInit (void)
 	memset( ui_svr_mapshotvalid, 0, sizeof( byte ) * ( ui_svr_nummaps + 1 ) );
 	// register null levelshot
 	if (ui_svr_mapshotvalid[ui_svr_nummaps] == M_UNSET) {	
-		if (R_DrawFindPic("/gfx/ui/noscreen.pcx"))
+		if (R_DrawFindPic(UI_NOSCREEN_NAME))
 			ui_svr_mapshotvalid[ui_svr_nummaps] = M_FOUND;
 		else
 			ui_svr_mapshotvalid[ui_svr_nummaps] = M_MISSING;
@@ -770,7 +770,7 @@ void DrawStartSeverLevelshot (void)
 	SCR_DrawFill (SCREEN_WIDTH/2+44, SCREEN_HEIGHT/2-70, 244, 184, ALIGN_CENTER, 60,60,60,255);
 
 	if ( ui_svr_mapshotvalid[i] == M_UNSET) { // init levelshot
-		Com_sprintf(mapshotname, sizeof(mapshotname), "/levelshots/%s.pcx", startmap);
+		Com_sprintf(mapshotname, sizeof(mapshotname), "/%s/%s.pcx", UI_MAP_SCRN_DIR,startmap);
 		if (R_DrawFindPic(mapshotname))
 			ui_svr_mapshotvalid[i] = M_FOUND;
 		else
@@ -778,12 +778,12 @@ void DrawStartSeverLevelshot (void)
 	}
 
 	if ( ui_svr_mapshotvalid[i] == M_FOUND) {
-		Com_sprintf(mapshotname, sizeof(mapshotname), "/levelshots/%s.pcx", startmap);
+		Com_sprintf(mapshotname, sizeof(mapshotname), "/%s/%s.pcx", UI_MAP_SCRN_DIR, startmap);
 
 		SCR_DrawPic (SCREEN_WIDTH/2+46, SCREEN_HEIGHT/2-68, 240, 180, ALIGN_CENTER, mapshotname, 1.0);
 	}
 	else if (ui_svr_mapshotvalid[ui_svr_nummaps] == M_FOUND)
-		SCR_DrawPic (SCREEN_WIDTH/2+46, SCREEN_HEIGHT/2-68, 240, 180, ALIGN_CENTER, "/gfx/ui/noscreen.pcx", 1.0);
+		SCR_DrawPic (SCREEN_WIDTH/2+46, SCREEN_HEIGHT/2-68, 240, 180, ALIGN_CENTER, UI_NOSCREEN_NAME, 1.0);
 	else
 		SCR_DrawFill (SCREEN_WIDTH/2+46, SCREEN_HEIGHT/2-68, 240, 180, ALIGN_CENTER, 0,0,0,255);
 }

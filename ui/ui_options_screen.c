@@ -352,8 +352,8 @@ void Options_Screen_MenuInit ( void )
 
 	int y = 3*MENU_LINE_SIZE;
 
-	s_options_screen_menu.x = SCREEN_WIDTH*0.5;
-	s_options_screen_menu.y = SCREEN_HEIGHT*0.5 - 58;
+	s_options_screen_menu.x = 460; // SCREEN_WIDTH*0.5;
+	s_options_screen_menu.y = 100; // SCREEN_HEIGHT*0.5 - 58;
 	s_options_screen_menu.nitems = 0;
 
 	s_options_screen_header.generic.type	= MTYPE_SEPARATOR;
@@ -525,8 +525,11 @@ void DrawMenuCrosshair (void)
 
 void Options_Screen_MenuDraw (void)
 {
+#if KINGPIN
+	M_Main_Draw();
+#else
 	Menu_DrawBanner( "m_banner_options" );
-
+#endif
 	Menu_AdjustCursor( &s_options_screen_menu, 1 );
 	Menu_Draw( &s_options_screen_menu );
 	DrawMenuCrosshair();

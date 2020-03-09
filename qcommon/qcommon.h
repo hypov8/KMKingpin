@@ -24,9 +24,21 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "../game/q_shared.h"
 
-#define	VERSION		0.20 //was 3.21
 
+#if KINGPIN //hypov8
+#define	VERSION		1.22 //0.20 //was 3.21 //hypov8
+#define	VERSION_INT	122  //hypov8
+#define KM_GAME_NAME "KMKingpin"
+#else
+#define	VERSION		0.20 //was 3.21 //hypov8
+#define KM_GAME_NAME "KMQuake2"
+#endif
+
+#if KINGPIN //hypov8
+#define	BASEDIRNAME	"main"
+#else
 #define	BASEDIRNAME	"baseq2"
+#endif
 
 #define DEFAULTPAK			"pak"
 #define DEFAULTMODEL		"male"
@@ -75,6 +87,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #endif
 
+//hypov8 add:
+#if KINGPIN
+#ifdef _WIN32
+typedef __int32 int32;
+typedef unsigned __int32 uint32;
+#else /* NON-WIN32 */
+typedef int32_t int32;
+typedef uint32_t uint32;
+#endif
+#endif
+
 //============================================================================
 
 typedef struct sizebuf_s
@@ -94,6 +117,9 @@ void SZ_Write (sizebuf_t *buf, void *data, int length);
 void SZ_Print (sizebuf_t *buf, char *data);	// strcats onto the sizebuf
 
 //============================================================================
+#if KINGPIN
+extern	entity_state_t	null_entity_state;
+#endif
 
 struct usercmd_s;
 struct entity_state_s;
@@ -195,16 +221,21 @@ PROTOCOL
 
 // protocol.h -- communications protocols
 
-#define	PROTOCOL_VERSION		56 // changed from 0.19, was 35
+#define	PROTOCOL_VERSION		56 // changed from 0.19, was 35 //hypov8 32?
 #define	R1Q2_PROTOCOL_VERSION	35
-#define	OLD_PROTOCOL_VERSION	34
+#define	OLD_PROTOCOL_VERSION	32 //hypov8
 
 //=========================================
 
 #define	PORT_MASTER	27900
 //#define	PORT_CLIENT	27901
 #define PORT_CLIENT    (rand()%11000)+5000 // Knightmare- random port for protection from Q2MSGS
+#if KINGPIN
+#define	PORT_SERVER	31520 //hypov8
+#else
+//#define	PORT_CLIENT	27901
 #define	PORT_SERVER	27910
+#endif
 
 //=========================================
 //Knightmare- increase UPDATE_BACKUP to eliminate "U_REMOVE: oldnum != newnum"
@@ -225,6 +256,35 @@ enum svc_ops_e
 {
 	svc_bad,
 
+#if KINGPIN
+	svc_muzzleflash,
+	svc_muzzleflash2,
+	svc_muzzleflash3,
+	svc_temp_entity,
+	svc_layout,
+	svc_inventory,
+	svc_hud,
+	svc_nop,
+	svc_disconnect,
+	svc_reconnect,
+	svc_sound,						// <see code>
+	svc_print,						// [byte] id [string] null terminated string
+	svc_stufftext,	 		/*13*/	// [string] stuffed into client's console buffer, should be \n terminated
+	svc_serverdata,			/*14*/	// [long] protocol ...
+	svc_configstring,		/*15*/	// [short] [string]
+	svc_spawnbaseline,		/*16*/	
+	svc_centerprint,		/*17*/	// [string] to put in center of the screen
+	svc_download,			/*18*/	// [short] size [size bytes]
+	svc_playerinfo,			/*19*/	// variable
+	svc_packetentities,		/*20*/	// [...]
+	svc_deltapacketentities,/*21*/	// [...]
+	svc_frame,				/*22*/
+	svc_configstring_pointer,
+	svc_pushdownload,
+	svc_cpacket,				// MH: compressed packet for patched clients
+	svc_xdownload,				// MH: download packet for patched clients
+	svc_fog						// = 21 Knightmare added //hypov8 added:
+#else
 	// these ops are known to the game dll
 	svc_muzzleflash,
 	svc_muzzleflash2,
@@ -249,6 +309,7 @@ enum svc_ops_e
 	svc_deltapacketentities,	// [...]
 	svc_frame,
 	svc_fog						// = 21 Knightmare added
+#endif
 };
 
 //==============================================
@@ -277,6 +338,16 @@ enum clc_ops_e
 #define	PS_M_GRAVITY		(1<<5)
 #define	PS_M_DELTA_ANGLES	(1<<6)
 
+#if KINGPIN //hypov8
+#define	PS_VIEWOFFSET		(1<<8)
+#define	PS_VIEWANGLES		(1<<9)
+#define	PS_KICKANGLES		(1<<10)
+#define	PS_BLEND			(1<<11)
+#define	PS_FOV				(1<<12)
+#define	PS_WEAPONINDEX		(1<<13)
+#define	PS_WEAPONFRAME		(1<<14)
+#define	PS_RDFLAGS			(1<<15)
+#else
 #define	PS_VIEWOFFSET		(1<<7)
 #define	PS_VIEWANGLES		(1<<8)
 #define	PS_KICKANGLES		(1<<9)
@@ -285,8 +356,7 @@ enum clc_ops_e
 #define	PS_WEAPONINDEX		(1<<12)
 #define	PS_WEAPONFRAME		(1<<13)
 #define	PS_RDFLAGS			(1<<14)
-
-#define	PS_BBOX				(1<<15)		// for R1Q2 protocol
+#define	PS_BBOX				(1<<15)
 
 // Knightmare- bits for sending weapon skin, second weapon model
 #define	PS_WEAPONSKIN		(1<<15)
@@ -300,7 +370,7 @@ enum clc_ops_e
 #define	PS_ACCEL			(1<<22)
 #define	PS_STOPSPEED		(1<<23)
 // end Knightmare
-
+#endif
 //==============================================
 
 // user_cmd_t communication
@@ -337,7 +407,11 @@ enum clc_ops_e
 #define	U_ANGLE2	(1<<2)
 #define	U_ANGLE3	(1<<3)
 #define	U_FRAME8	(1<<4)		// frame is a byte
+#if KINGPIN
+#define	U_EVENT		(1<<13)
+#else
 #define	U_EVENT		(1<<5)
+#endif
 #define	U_REMOVE	(1<<6)		// REMOVE this entity, don't add it
 #define	U_MOREBITS1	(1<<7)		// read one additional byte
 
@@ -366,6 +440,7 @@ enum clc_ops_e
 #define	U_SOUND		(1<<26)
 #define	U_SOLID		(1<<27)
 
+#if !KINGPIN //hypov8
 // Knightmare- 1/18/2002- bits for extra model indices
 #define	U_VELOCITY	(1<<28)	// for R1Q2 protocol
 #define	U_MODEL5	(1<<28)		
@@ -373,6 +448,17 @@ enum clc_ops_e
 #define	U_ATTENUAT	(1<<30)	// sound attenuation
 #define	U_ALPHA		(1<<31)	// transparency
 // end Knightmare
+#endif
+
+#if KINGPIN //hypov8
+#define	U_ORIGINDELTA (1<<5)
+#define	U_SOUND16	(1<<20)
+#define	U_PART3MODEL (1<<21)
+#define	U_NUMPARTS	(1<<28)
+#define	U_MODELPARTS (1<<29)
+#define	U_MODELLIGHT (1<<30)
+#define	U_SCALE		(1<<31)
+#endif
 
 /*
 ==============================================================
@@ -595,7 +681,11 @@ NET
 //Knightmare- increase max message size to eliminate SZ_Getspace: Overflow
 //Mark Shan is just gonna love this!!
 #ifndef NET_SERVER_BUILD
-#define	MAX_MSGLEN		44800
+	#if KINGPIN //hypov8
+		#define	MAX_MSGLEN		1400	// max length of a message
+	#else
+		#define	MAX_MSGLEN		44800
+	#endif
 #else
 #define	MAX_MSGLEN		2800
 #endif
@@ -606,7 +696,11 @@ NET
 
 typedef enum {NA_LOOPBACK, NA_BROADCAST, NA_IP, NA_IPX, NA_BROADCAST_IPX} netadrtype_t;
 
+#if KINGPIN //hypov8
+typedef enum {NS_CLIENT, NS_SERVER, NS_SERVER_GS} netsrc_t;
+#else
 typedef enum {NS_CLIENT, NS_SERVER} netsrc_t;
+#endif
 
 typedef struct
 {
@@ -671,6 +765,17 @@ typedef struct
 // message is copied to this buffer when it is first transfered
 	int			reliable_length;
 	byte		reliable_buf[MAX_MSGLEN-16];	// unacked reliable message
+
+#if KINGPIN
+		// MH: packet loss counting
+	qboolean	countacks;
+	unsigned	out_total;
+	unsigned	out_dropped;
+	unsigned	in_total;
+	unsigned	in_dropped;
+
+	unsigned	packetdup;
+#endif
 } netchan_t;
 
 extern	netadr_t	net_from;
@@ -873,7 +978,12 @@ int			Com_ServerState (void);		// this should have just been a cvar...
 void		Com_SetServerState (int state);
 
 unsigned	Com_BlockChecksum (void *buffer, int length);
+
+#if KINGPIN
+byte		COM_BlockSequenceCheckByte(byte *base, int length, int sequence, int challenge);
+#else
 byte		COM_BlockSequenceCRCByte (byte *base, int length, int sequence);
+#endif
 
 float	frand(void);	// 0 ti 1
 float	crand(void);	// -1 to 1
@@ -939,6 +1049,16 @@ void	Sys_Error (char *error, ...);
 void	Sys_Quit (void);
 char	*Sys_GetClipboardData( void );
 void	Sys_CopyProtect (void);
+
+#if KINGPIN
+// MH: worker thread stuff
+#ifdef _WIN32
+intptr_t Sys_StartThread(unsigned long (__stdcall *func)(void*), void *param, int priority);
+#else
+intptr_t Sys_StartThread(void *(*func)(void*), void *param, int priority);
+#endif
+void Sys_WaitThread(intptr_t thread);
+#endif
 
 /*
 ==============================================================

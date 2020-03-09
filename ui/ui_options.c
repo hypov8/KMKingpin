@@ -72,8 +72,8 @@ static void MenuInterfaceFunc ( void *unused )
 
 void Options_MenuInit ( void )
 {
-	s_options_menu.x = SCREEN_WIDTH*0.5 - 24;
-	s_options_menu.y = SCREEN_HEIGHT*0.5 - 58;
+	s_options_menu.x = 320;// SCREEN_WIDTH*0.5 - 24;
+	s_options_menu.y = 100; //SCREEN_HEIGHT*0.5 - 58;
 	s_options_menu.nitems = 0;
 
 	s_options_sound_section.generic.type	= MTYPE_ACTION;
@@ -134,8 +134,11 @@ void Options_MenuInit ( void )
 
 void Options_MenuDraw (void)
 {
+#if KINGPIN
+	M_Main_Draw();
+#else
 	Menu_DrawBanner( "m_banner_options" );
-
+#endif
 	Menu_AdjustCursor( &s_options_menu, 1 );
 	Menu_Draw( &s_options_menu );
 }

@@ -27,17 +27,31 @@ image_t		*draw_chars;
 extern	qboolean	scrap_dirty;
 void Scrap_Upload (void);
 
+#if !KINGPIN
+#define DEFAULT_FONT_SIZE 10.0f
+#else
 #define DEFAULT_FONT_SIZE 8.0f
+#endif
 
 void RefreshFont (void)
 {
 	con_font->modified = false;
+#if KINGPIN
+	draw_chars = R_FindImage (va("fonts/%s.tga", con_font->string), it_pic);
+	if (!draw_chars) // fall back on default font
+		draw_chars = R_FindImage ("fonts/default.tga", it_pic);
+	//if (!draw_chars) // fall back on old Q2 conchars
+	//	draw_chars = R_FindImage ("pics/conchars2.tga", it_pic);
+	if (!draw_chars) // fall back on old Q2 conchars
+		draw_chars = R_FindImage ("pics/conchars.tga", it_pic);
 
+#else
 	draw_chars = R_FindImage (va("fonts/%s.pcx", con_font->string), it_pic);
 	if (!draw_chars) // fall back on default font
 		draw_chars = R_FindImage ("fonts/default.pcx", it_pic);
 	if (!draw_chars) // fall back on old Q2 conchars
 		draw_chars = R_FindImage ("pics/conchars.pcx", it_pic);
+#endif
 	if (!draw_chars) // prevent crash caused by missing font
 		VID_Error (ERR_FATAL, "RefreshFont: couldn't load pics/conchars");
 
@@ -194,10 +208,26 @@ image_t	*R_DrawFindPic (char *name)
 	image_t *gl;
 	char	fullname[MAX_QPATH];
 
-	if (name[0] != '/' && name[0] != '\\')
+	if (name[0] != '/' && name[0] != '\\' )
 	{
+#if KINGPIN //hypov8 todo: this stops hirez files being scaled down
+		//hypov8 add: check for folder. issue with configstrings for map names, eg pics/420dm1.pcx
+		if ( strchr(name,'\\') || strchr(name,'/') )
+			gl = R_FindImage (name, it_pic);
+		else
+		{
+			Com_sprintf(fullname, sizeof(fullname), "pics/%s.tga", name);
+			gl = R_FindImage(fullname, it_pic);
+			if (!gl) { //tga failed
+				Com_sprintf(fullname, sizeof(fullname), "pics/%s.pcx", name);
+				gl = R_FindImage(fullname, it_pic);
+			}
+
+		}
+#else
 		Com_sprintf (fullname, sizeof(fullname), "pics/%s.pcx", name);
-		gl = R_FindImage (fullname, it_pic);
+		gl = R_FindImage(fullname, it_pic);
+#endif
 	}
 	else
 		gl = R_FindImage (name+1, it_pic);

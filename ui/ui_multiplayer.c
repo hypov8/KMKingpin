@@ -47,8 +47,11 @@ static menuaction_s		s_backmain_action;
 
 static void Multiplayer_MenuDraw (void)
 {
+#if KINGPIN
+	M_Main_Draw();
+#else
 	Menu_DrawBanner( "m_banner_multiplayer" );
-
+#endif
 	Menu_AdjustCursor( &s_multiplayer_menu, 1 );
 	Menu_Draw( &s_multiplayer_menu );
 }
@@ -75,8 +78,8 @@ void DownloadOptionsFunc( void *unused )
 
 void Multiplayer_MenuInit( void )
 {
-	s_multiplayer_menu.x = SCREEN_WIDTH*0.5 - 64;
-//	s_multiplayer_menu.y = 0;
+	s_multiplayer_menu.x = 320; // SCREEN_WIDTH*0.5 - 14;
+	s_multiplayer_menu.y = 120;//0;
 	s_multiplayer_menu.nitems = 0;
 
 	s_join_network_server_action.generic.type	= MTYPE_ACTION;
@@ -122,7 +125,7 @@ void Multiplayer_MenuInit( void )
 
 	Menu_SetStatusBar( &s_multiplayer_menu, NULL );
 
-	Menu_Center( &s_multiplayer_menu );
+	//Menu_Center( &s_multiplayer_menu ); //hypov8
 }
 
 const char *Multiplayer_MenuKey( int key )

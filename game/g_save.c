@@ -451,7 +451,7 @@ void InitGame (void)
 			gi.cvar_forceset("cl_gun",               va("%d",(int)(lazarus_cl_gun->value)));
 			gi.cvar_forceset("crosshair",            va("%d",(int)(lazarus_crosshair->value)));
 		} else {*/
-			gi.cvar_forceset("lazarus_cd_loop",        va("%d",(int)(cd_loopcount->value)));
+			gi.cvar_forceset("lazarus_cd_loop",        va("%i",(int)(cd_loopcount->value))); //hypov8 was %d
 #ifndef KMQUAKE2_ENGINE_MOD // engine has zoom autosensitivity
 			gi.cvar_forceset("lazarus_pitch",          va("%f",m_pitch->value));
 			gi.cvar_forceset("lazarus_yaw",            va("%f",m_yaw->value));

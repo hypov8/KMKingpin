@@ -193,7 +193,7 @@ void thing_grenade_boom (edict_t *self)
 		monster->monsterinfo.run(monster);
 }
 
-void thing_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void thing_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if(self->target_ent != other)
 		return;

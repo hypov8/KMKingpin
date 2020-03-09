@@ -324,9 +324,11 @@ void target_explosion_explode (edict_t *self)
 	float		save;
 
 	gi.WriteByte (svc_temp_entity);
+#if !KINGPIN //hypov8 todo: dll
 	if (self->spawnflags & 1)	 //Knightmare- big explosion
 		gi.WriteByte (TE_EXPLOSION1_BIG);
 	else
+#endif
 		gi.WriteByte (TE_EXPLOSION1);
 	gi.WritePosition (self->s.origin);
 	gi.multicast (self->s.origin, MULTICAST_PHS);
@@ -767,10 +769,12 @@ void use_target_blaster (edict_t *self, edict_t *other, edict_t *activator)
 	else if(self->sounds == 5)
 	{
 		fire_bullet(self, start, movedir, self->dmg, 2, 0, 0, MOD_TARGET_BLASTER);
+#if !KINGPIN //hypov8 todo: dll
 		gi.WriteByte(svc_temp_entity);
 		gi.WriteByte(TE_CHAINFIST_SMOKE);
 		gi.WritePosition(start);
 		gi.multicast(start, MULTICAST_PVS);
+#endif
 		gi.positioned_sound(start,self,CHAN_WEAPON,gi.soundindex(va("weapons/machgf%db.wav",rand() % 5 + 1)),1,ATTN_NORM,0);
 	}
 	else if(self->sounds == 6)
@@ -2275,7 +2279,9 @@ void target_effect_trail (edict_t *self, edict_t *activator)
 	gi.WriteByte(svc_temp_entity);
 	gi.WriteByte(self->style);
 	if((self->style == TE_PARASITE_ATTACK) || (self->style==TE_MEDIC_CABLE_ATTACK) ||
-	   (self->style == TE_HEATBEAM)        || (self->style==TE_MONSTER_HEATBEAM)   ||
+#if !KINGPIN //hypov8 todo: dll   
+		(self->style == TE_HEATBEAM)        || (self->style==TE_MONSTER_HEATBEAM)   ||
+#endif
 	   (self->style == TE_GRAPPLE_CABLE)                                             )
 		gi.WriteShort(self-g_edicts);
 	gi.WritePosition(self->s.origin);
@@ -2288,8 +2294,12 @@ void target_effect_trail (edict_t *self, edict_t *activator)
 	if(level.num_reflectors)
 	{
 		if((self->style == TE_RAILTRAIL) || (self->style == TE_BUBBLETRAIL) ||
-		   (self->style == TE_BFG_LASER) || (self->style == TE_DEBUGTRAIL)  ||
-		   (self->style == TE_BUBBLETRAIL2))
+		   (self->style == TE_BFG_LASER) 
+#if !KINGPIN //hypov8 todo: dll
+		   || (self->style == TE_DEBUGTRAIL)  ||
+		   (self->style == TE_BUBBLETRAIL2)
+#endif
+		   )
 		   ReflectTrail(self->style,self->s.origin,target->s.origin);
 	}
 }
@@ -2342,7 +2352,9 @@ void target_effect_sparks (edict_t *self, edict_t *activator)
 	gi.WriteByte(svc_temp_entity);
 	gi.WriteByte(self->style);
 	gi.WritePosition(self->s.origin);
+#if !KINGPIN //hypov8 todo: dll
 	if(self->style != TE_CHAINFIST_SMOKE) 
+#endif
 		gi.WriteDir(self->movedir);
 	gi.multicast(self->s.origin, MULTICAST_PVS);
 
@@ -2414,11 +2426,13 @@ void target_effect_tunnel_sparks (edict_t *self, edict_t *activator)
 */
 void target_effect_widowbeam(edict_t *self, edict_t *activator)
 {
+#if !KINGPIN //hypov8 todo: dll
 	gi.WriteByte (svc_temp_entity);
 	gi.WriteByte (TE_WIDOWBEAMOUT);
 	gi.WriteShort (20001);
 	gi.WritePosition (self->s.origin);
 	gi.multicast (self->s.origin, MULTICAST_PVS);
+#endif
 }
 //===============================================================================
 
@@ -2463,7 +2477,9 @@ void SP_target_effect (edict_t *self)
 	else
 		self->movetype = MOVETYPE_NONE;
 
-	switch (self->style ) {
+	switch (self->style ) 
+	{
+#if !KINGPIN //hypov8 todo: dll
 	case TE_FLASHLIGHT:
 		self->play = target_effect_at;
 		break;
@@ -2477,6 +2493,7 @@ void SP_target_effect (edict_t *self)
 		if(!self->speed)
 			self->speed = 75;
 		break;
+#endif
 	case TE_SPLASH:
 	case TE_LASER_SPARKS:
 	case TE_WELDING_SPARKS:
@@ -2491,6 +2508,7 @@ void SP_target_effect (edict_t *self)
 	case TE_MEDIC_CABLE_ATTACK:
 	case TE_BFG_LASER:
 	case TE_GRAPPLE_CABLE:
+#if !KINGPIN //hypov8 todo: dll
 	case TE_DEBUGTRAIL:
 	case TE_HEATBEAM:
 	case TE_MONSTER_HEATBEAM:
@@ -2499,15 +2517,19 @@ void SP_target_effect (edict_t *self)
 			gi.dprintf("%s at %s with style=%d needs a target\n",self->classname,vtos(self->s.origin),self->style);
 			G_FreeEdict(self);
 		} else
+#endif
 			self->play = target_effect_trail;
 		break;
+#if !KINGPIN //hypov8 todo: dll
 	case TE_LIGHTNING:
 		if(!self->target) {
 			gi.dprintf("%s at %s with style=%d needs a target\n",self->classname,vtos(self->s.origin),self->style);
 			G_FreeEdict(self);
 		} else
+#endif
 			self->play = target_effect_lightning;
 		break;
+
 	case TE_GUNSHOT:
 	case TE_BLOOD:
 	case TE_BLASTER:
@@ -2517,6 +2539,7 @@ void SP_target_effect (edict_t *self)
 	case TE_SHIELD_SPARKS:
 	case TE_BULLET_SPARKS:
 	case TE_GREENBLOOD:
+#if !KINGPIN //hypov8 todo: dll
 	case TE_BLASTER2:
 	case TE_MOREBLOOD:
 	case TE_HEATBEAM_SPARKS:
@@ -2524,6 +2547,7 @@ void SP_target_effect (edict_t *self)
 	case TE_CHAINFIST_SMOKE:
 	case TE_ELECTRIC_SPARKS:
 	case TE_FLECHETTE:
+#endif
 		self->play = target_effect_sparks;
 		G_SetMovedir (self->s.angles, self->movedir);
 		break;
@@ -2537,6 +2561,7 @@ void SP_target_effect (edict_t *self)
 	case TE_BFG_BIGEXPLOSION:
 	case TE_BOSSTPORT:
 	case TE_PLASMA_EXPLOSION:
+#if !KINGPIN //hypov8 todo: dll
 	case TE_PLAIN_EXPLOSION:
 	case TE_TRACKER_EXPLOSION:
 	case TE_TELEPORT_EFFECT:
@@ -2545,6 +2570,7 @@ void SP_target_effect (edict_t *self)
 	case TE_WIDOWSPLASH:
 	case TE_EXPLOSION1_BIG:
 	case TE_EXPLOSION1_NP:
+#endif
 		self->play = target_effect_explosion;
 		break;
 	case TE_TUNNEL_SPARKS:
@@ -2554,10 +2580,12 @@ void SP_target_effect (edict_t *self)
 			self->sounds = 116; // Light blue, same color used by Xatrix
 		self->play = target_effect_tunnel_sparks;
 		break;
+#if !KINGPIN //hypov8 todo: dll
 	case TE_WIDOWBEAMOUT:
 		self->play = target_effect_widowbeam;
 		G_SetMovedir (self->s.angles, self->movedir);
 		break;
+#endif
 	default:
 		gi.dprintf("%s at %s: bad style %d\n",self->classname,vtos(self->s.origin),self->style);
 	}
@@ -4059,7 +4087,7 @@ void SP_target_fade (edict_t *self)
   Spawnflags
               1 = START_ON
 =============================================================================*/
-void button_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf);
+void button_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf);
 void Think_CalcMoveSpeed (edict_t *self);
 void Think_SpawnDoorTrigger (edict_t *ent);
 void func_train_find (edict_t *self);

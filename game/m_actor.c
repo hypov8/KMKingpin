@@ -1594,7 +1594,7 @@ for JUMP only:
 "height"		speed thrown upwards (default 200)
 */
 
-void target_actor_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void target_actor_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	vec3_t	v;
 
@@ -1847,7 +1847,8 @@ void actor_files ()
 		s_match    = 0;
 		w_match[0] = 0;
 		w_match[1] = 0;
-		if(num_actors > 0) {
+		if(num_actors > 0) 
+		{
 			for(j=0; j<num_actors && (s_match == 0 || w_match[0] == 0 || w_match[1] == 0); j++) {
 				e0 = &g_edicts[actors[j].index];
 				if(!Q_stricmp(e->usermodel,e0->usermodel)) {
@@ -1879,7 +1880,8 @@ void actor_files ()
 				e->actor_model_index[1] = e0->actor_model_index[k];
 			}
 		}
-		if(!s_match) {
+		if(!s_match) 
+		{
 			// search for sounds on hard disk and in paks
 			actors[num_actors].index  = i;
 			num_actors++;

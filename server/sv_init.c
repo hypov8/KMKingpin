@@ -74,6 +74,230 @@ int SV_FindIndex (char *name, int start, int max, qboolean create)
 }
 
 
+#if KINGPIN
+/*
+	MH: The Kingpin client can download models/skins/maps/textures but its support for
+	sounds/images/skies is broken. The broken image download support can be taken
+	advantage of though to allow those things to be downloaded, which is what the
+	code below does. The "imageindex" function can be used by the game to add any
+	files to the downloadable list (only files starting with "/pics/" will be added
+	to the image list).
+	
+	When a client connects,	the server sends the downloadable files list in place
+	of the image list. The image list is then sent when the client has finished
+	connecting.
+*/
+
+static void DownloadIndex(const char *name)
+{
+	// some common files that the player should already have
+	static const char *ignore_sound[] = {
+		"actors/player/male/fry.wav",
+		"actors/player/male/gasp1.wav",
+		"actors/player/male/gasp2.wav",
+		"misc/w_pkup.wav",
+		"weapons/bullethit_tin.wav",
+		"weapons/bullethit_tin2.wav",
+		"weapons/bullethit_tin3.wav",
+		"weapons/machinegun/machgf1b.wav",
+		"weapons/melee/swing.wav",
+		"weapons/pistol/silencer.wav",
+		"weapons/pistol/silencerattatch.wav",
+		"weapons/ric1.wav",
+		"weapons/ric2.wav",
+		"weapons/ric3.wav",
+		"weapons/shotgun/shotgf1b.wav",
+		"weapons/shotgun/shotgr1b.wav",
+		"world/amb_wind.wav",
+		"world/city.wav",
+		"world/citybg.wav",
+		"world/citybglow.wav",
+		"world/citybglow2.wav",
+		"world/crate1.wav",
+		"world/crate2.wav",
+		"world/crate3.wav",
+		"world/doors/dr1_end.wav",
+		"world/doors/dr1_mid.wav",
+		"world/doors/dr1_strt.wav",
+		"world/doors/dr2_endb.wav",
+		"world/doors/dr2_mid.wav",
+		"world/doors/dr2_strt.wav",
+		"world/doors/dr3_endb.wav",
+		"world/doors/dr3_mid.wav",
+		"world/doors/dr3_strt.wav",
+		"world/fire.wav",
+		"world/fire_sm.wav",
+		"world/lightf_broke.wav",
+		"world/lightf_broker.wav",
+		"world/lightf_hum.wav",
+		"world/lightf_hum2.wav",
+		"world/pickups/ammo.wav",
+		"world/pickups/generic.wav",
+		"world/pickups/health.wav",
+		"world/plats/pt1_end.wav",
+		"world/plats/pt1_mid.wav",
+		"world/plats/pt1_strt.wav",
+		"world/switches/butn2.wav",
+		"world/trash1.wav",
+		"world/trash2.wav",
+		"world/trash3.wav",
+		NULL
+	};
+
+	char lwrname[MAX_QPATH], *ext;
+	int i;
+
+	// only add to the downloadable files list during the map loading phase
+	if (!(int)allow_download->value || sv.state != ss_loading)
+		return;
+	if (!name || !name[0] || strlen(name) >= sizeof(lwrname))
+		return;
+	strcpy(lwrname, name);
+	Q_strlwr(lwrname);
+
+	ext = strrchr(lwrname, '.');
+	if (ext && (!strcmp(ext+1, "dll") || !strcmp(ext+1, "exe")))
+	{
+		Com_Printf (S_COLOR_YELLOW"WARNING: '%s' will not be downloadable because it is an executable.\n", lwrname);
+		return;
+	}
+
+	if (!strchr(lwrname, '/') && !Cvar_VariableString("clientdir")[0])
+	{
+		Com_Printf (S_COLOR_YELLOW"WARNING: '%s' will not be downloadable because it is not in a subdirectory.\n", lwrname);
+		return;
+	}
+
+	if (!strncmp(lwrname, "pics/", 5))
+	{
+		if (ext && !strcmp(ext, ".tga") && !strncmp(lwrname+5, "h_", 2))
+			return;
+	}
+	else if (!strncmp(lwrname, "sound/", 6))
+	{
+		for (i=0; ignore_sound[i]; i++)
+			if (!strcmp(lwrname+6, ignore_sound[i]))
+				return;
+	}
+
+	// don't add files that are in a PAK
+	if (FS_LoadFile(lwrname, NULL) > 0 /*&& lastpakfile*/)
+		return;
+
+	for (i=0; i<MAX_IMAGES && sv.dlconfigstrings[i][0]; i++)
+		if (!strcmp(sv.dlconfigstrings[i], lwrname))
+			return;
+	if (i == MAX_IMAGES)
+	{
+		Com_Printf (S_COLOR_YELLOW"WARNING: Ran out of download configstrings while attempting to add '%s'\n", lwrname);
+		return;
+	}
+
+	strcpy(sv.dlconfigstrings[i], lwrname);
+}
+
+int EXPORT SV_ModelIndex (const char *name)
+{
+	char lwrname[MAX_QPATH];
+	int i;
+
+	if (!name || !name[0] || strlen(name) >= sizeof(sv.configstrings[0]))
+		return 0;
+	strcpy(lwrname, name);
+	Q_strlwr(lwrname);
+
+	i = SV_FindIndex (lwrname, CS_MODELS, MAX_MODELS, true);
+	if (i && !strncmp(lwrname, "models/objects/", 15))
+	{
+		// Kingpin doesn't auto-download model skins, so add them to downloadable files list
+		void *data;
+		FS_LoadFile(lwrname, &data);
+		if (data)
+		{
+			header_mdx_t *pheader = (header_mdx_t*)data;
+			if (LittleLong(pheader->ident) == ALIAS_MDX_HEADER && LittleLong(pheader->version) == ALIAS_MDX_VERSION)
+			{
+				int a, ns = LittleLong(pheader->num_skins);
+				for (a=0; a<ns; a++)
+					DownloadIndex((char*)data + LittleLong(pheader->ofs_skins) + a * MAX_MDX_SKINNAME);
+			}
+			FS_FreeFile(data);
+		}
+	}
+	return i;
+}
+
+int EXPORT SV_SoundIndex (const char *name)
+{
+	char lwrname[MAX_QPATH];
+	int i;
+
+	if (!name || !name[0] || strlen(name) >= sizeof(lwrname))
+		return 0;
+	strcpy(lwrname, name);
+	Q_strlwr(lwrname);
+
+	i = SV_FindIndex (lwrname, CS_SOUNDS, MAX_SOUNDS, true);
+	if (i && lwrname[0] != '*')
+	{
+		char buf[MAX_QPATH + 1];
+		Com_sprintf(buf, sizeof(buf), "sound/%s", lwrname);
+		DownloadIndex(buf);
+	}
+	return i;
+}
+
+int EXPORT SV_ImageIndex (const char *name)
+{
+	char lwrname[MAX_QPATH];
+	int i;
+
+	if (!name || !name[0] || !strchr(name+1,'/') || strlen(name) >= sizeof(lwrname))
+		return 0;
+	strcpy(lwrname, name);
+	Q_strlwr(lwrname);
+
+	// Kingpin always begins image files with "/pics/"
+	if (!strncmp(lwrname, "/pics/", 6))
+		i = SV_FindIndex (lwrname, CS_IMAGES, MAX_IMAGES, true);
+	else
+		i = 0;
+	DownloadIndex(lwrname[0] == '/' ? lwrname+1 : lwrname);
+	return i;
+}
+
+int	EXPORT SV_SkinIndex(int modelindex, const char *name)
+{
+	char lwrname[MAX_QPATH];
+	int i, len, len2;
+
+	len = strlen(name);
+	if ((uint32)modelindex > MAX_MODELS || len >= sizeof(lwrname))
+		return 0;
+	strcpy(lwrname, name);
+	Q_strlwr(lwrname);
+
+	len2 = strlen(sv.configstrings[CS_MODELSKINS + modelindex]);
+	for (i=0; i<len2; i++)
+		if (!strncmp(sv.configstrings[CS_MODELSKINS + modelindex] + i, lwrname, len))
+			return i;
+
+	strcpy(sv.configstrings[CS_MODELSKINS + modelindex] + i, lwrname);
+
+	if (sv.state != ss_loading)
+	{
+		SZ_Clear (&sv.multicast); //hypov8 todo: ok?
+		//MSG_BeginWriting (svc_configstring);
+		MSG_WriteChar (&sv.multicast, svc_configstring); //hypov8 todo: ok?
+		MSG_WriteShort (&sv.multicast, CS_MODELSKINS + modelindex);
+		MSG_WriteString (&sv.multicast, sv.configstrings[CS_MODELSKINS + modelindex]);
+		MSG_WriteByte (&sv.multicast, len);
+		SV_Multicast (NULL, MULTICAST_ALL_R);
+	}
+	return i;
+}
+#else
+
 int SV_ModelIndex (char *name)
 {
 	return SV_FindIndex (name, CS_MODELS, MAX_MODELS, true);
@@ -88,7 +312,7 @@ int SV_ImageIndex (char *name)
 {
 	return SV_FindIndex (name, CS_IMAGES, MAX_IMAGES, true);
 }
-
+#endif
 
 /*
 ================
@@ -208,6 +432,9 @@ void SV_SpawnServer (char *server, char *spawnpoint, server_state_t serverstate,
 	// save name for levels that don't set message
 //	strncpy (sv.configstrings[CS_NAME], server);
 	Q_strncpyz (sv.configstrings[CS_NAME], server, sizeof(sv.configstrings[CS_NAME]));
+#if KINGPIN
+	strcpy (sv.configstrings[CS_SERVER_VERSION], "200"); // 2.00
+#else
 	if (Cvar_VariableValue ("deathmatch"))
 	{
 		Com_sprintf(sv.configstrings[CS_AIRACCEL], sizeof(sv.configstrings[CS_AIRACCEL]), "%g", sv_airaccelerate->value);
@@ -219,6 +446,7 @@ void SV_SpawnServer (char *server, char *spawnpoint, server_state_t serverstate,
 		Q_strncpyz(sv.configstrings[CS_AIRACCEL], "0", sizeof(sv.configstrings[CS_AIRACCEL]));
 		pm_airaccelerate = 0;
 	}
+#endif
 
 	SZ_Init (&sv.multicast, sv.multicast_buf, sizeof(sv.multicast_buf));
 
@@ -226,7 +454,7 @@ void SV_SpawnServer (char *server, char *spawnpoint, server_state_t serverstate,
 	Q_strncpyz (sv.name, server, sizeof(sv.name));
 
 	// leave slots at start for clients only
-	for (i=0 ; i<maxclients->value ; i++)
+	for (i=0 ; i<(int)maxclients->value ; i++)
 	{
 		// needs to reconnect
 		if (svs.clients[i].state > cs_connected)
@@ -354,14 +582,14 @@ void SV_InitGame (void)
 	// init clients
 	if (Cvar_VariableValue ("deathmatch"))
 	{
-		if (maxclients->value <= 1)
+		if ((int)maxclients->value <= 1)
 			Cvar_FullSet ("maxclients", "8", CVAR_SERVERINFO | CVAR_LATCH);
-		else if (maxclients->value > MAX_CLIENTS)
+		else if ((int)maxclients->value > MAX_CLIENTS)
 			Cvar_FullSet ("maxclients", va("%i", MAX_CLIENTS), CVAR_SERVERINFO | CVAR_LATCH);
 	}
 	else if (Cvar_VariableValue ("coop"))
 	{
-		if (maxclients->value <= 1 || maxclients->value > 4)
+		if ((int)maxclients->value <= 1 || (int)maxclients->value > 4)
 			Cvar_FullSet ("maxclients", "4", CVAR_SERVERINFO | CVAR_LATCH);
 	}
 	else	// non-deathmatch, non-coop is one player
@@ -370,12 +598,12 @@ void SV_InitGame (void)
 	}
 
 	svs.spawncount = rand();
-	svs.clients = Z_Malloc (sizeof(client_t)*maxclients->value);
-	svs.num_client_entities = maxclients->value*UPDATE_BACKUP*64;
+	svs.clients = Z_Malloc (sizeof(client_t)*(int)maxclients->value);
+	svs.num_client_entities = (int)maxclients->value*UPDATE_BACKUP*64;
 	svs.client_entities = Z_Malloc (sizeof(entity_state_t)*svs.num_client_entities);
 
 	// init network stuff
-	NET_Config ( (maxclients->value > 1) );
+	NET_Config ( ((int)maxclients->value > 1) );
 
 	// heartbeats will always be sent to the id master
 	svs.last_heartbeat = -99999;		// send immediately
@@ -384,8 +612,9 @@ void SV_InitGame (void)
 
 	// init game
 	SV_InitGameProgs ();
-	for (i = 0; i < maxclients->value; i++)
+	for (i = 0; i < (int)maxclients->value; i++)
 	{
+
 		ent = EDICT_NUM(i+1);
 		ent->s.number = i+1;
 		svs.clients[i].edict = ent;

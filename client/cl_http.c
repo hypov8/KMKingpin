@@ -314,6 +314,9 @@ static void CL_StartHTTPDownload (dlqueue_t *entry, dlhandle_t *dl)
 		{
 			Com_Printf ("CL_StartHTTPDownload: Couldn't open %s for writing.\n", dl->filePath);
 			entry->state = DLQ_STATE_DONE;
+#if !KINGPIN
+			pendingCount--;	// Knightmare- fix for curl_update limbo from [HCI]Maraa'kate
+#endif
 			//CL_RemoveHTTPDownload (entry->quakePath);
 			return;
 		}

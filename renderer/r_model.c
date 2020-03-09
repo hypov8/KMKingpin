@@ -27,9 +27,15 @@ int		modfilelen;
 void Mod_LoadSpriteModel (model_t *mod, void *buffer);
 void Mod_LoadBrushModel (model_t *mod, void *buffer);
 void Mod_LoadAliasMD2Model (model_t *mod, void *buffer);
-
 #ifdef MD2_AS_MD3
 void Mod_LoadAliasMD2ModelNew (model_t *mod, void *buffer);
+#endif
+
+#if KINGPIN
+void Mod_LoadAliasMDXModel (model_t *mod, void *buffer);
+#ifdef MDX_AS_MD3
+void Mod_LoadAliasMDXModelNew (model_t *mod, void *buffer);
+#endif
 #endif
 
 //Harven++ MD3
@@ -190,6 +196,7 @@ model_t *Mod_ForName (char *name, qboolean crash)
 	model_t	*mod;
 	unsigned *buf;
 	int		i;
+	static char tmpname[64]; //hypov8 debug. store last model
 	
 	if (!name[0])
 		VID_Error (ERR_DROP, "Mod_ForName: NULL name");
@@ -256,18 +263,31 @@ model_t *Mod_ForName (char *name, qboolean crash)
 	
 	switch (LittleLong(*(unsigned *)buf))
 	{
-	case IDALIASHEADER:
+	case ALIAS_MD2_HEADER:
 #ifdef MD2_AS_MD3
-		loadmodel->extradata = Hunk_Begin (0x500000); // was 0x800000
+		loadmodel->extradata = Hunk_Begin (0x900000); // was 0x800000 //9.4mb
 		Mod_LoadAliasMD2ModelNew (mod, buf);
 #else
 		loadmodel->extradata = Hunk_Begin (0x200000);
 		Mod_LoadAliasMD2Model (mod, buf);
 #endif // MD2_AS_MD3
 		break;
+#if KINGPIN
+	case IDALIASHEADER_KP:
+	#ifdef MDX_AS_MD3
+		loadmodel->extradata = Hunk_Begin (0x1600000); // was 0x800000 //hypov8 23mb for 1 model!!!
+		Mod_LoadAliasMDXModelNew (mod, buf);
+	#else
+		loadmodel->extradata = Hunk_Begin (0x400000);
+		Mod_LoadAliasMDXModel (mod, buf);
+
+	#endif // MDX_AS_MD3
+		break;
+#endif
+
 	//Harven++ MD3
 	case IDMD3HEADER:
-		loadmodel->extradata = Hunk_Begin (0x800000);
+		loadmodel->extradata = Hunk_Begin (0x800000); //hypov8 todo: 8.3 mb enough?
 		Mod_LoadAliasMD3Model (mod, buf);
 		break;
 	//Harven-- MD3		
@@ -285,6 +305,8 @@ model_t *Mod_ForName (char *name, qboolean crash)
 		VID_Error (ERR_DROP,"Mod_NumForName: unknown fileid for %s", mod->name);
 		break;
 	}
+
+	strcpy(tmpname, name);
 
 	loadmodel->extradatasize = Hunk_End ();
 
@@ -354,8 +376,8 @@ Mod_LoadVertexes
 */
 void Mod_LoadVertexes (lump_t *l)
 {
-	dvertex_t	*in;
-	mvertex_t	*out;
+	dvertex_q2_t	*in;
+	mvertex_q2_t	*out;
 	int			i, count;
 
 	in = (void *)(mod_base + l->fileofs);
@@ -401,7 +423,7 @@ Mod_LoadSubmodels
 */
 void Mod_LoadSubmodels (lump_t *l)
 {
-	dmodel_t	*in;
+	dmodel_q2_t	*in;
 	mmodel_t	*out;
 	int			i, j, count;
 
@@ -436,7 +458,7 @@ Mod_LoadEdges
 */
 void Mod_LoadEdges (lump_t *l)
 {
-	dedge_t *in;
+	dedge_q2_t *in;
 	medge_t *out;
 	int 	i, count;
 
@@ -633,8 +655,11 @@ static void Mod_GetWalSize (const char *name, int *width, int *height)
 	char			path[MAX_QPATH];
 	miptex_t		*mt;
 	
+#if KINGPIN
+	Com_sprintf (path, sizeof(path), "textures/%s.tga", name);
+#else
 	Com_sprintf (path, sizeof(path), "textures/%s.wal", name);
-
+#endif
 	if (Mod_CheckWalSizeList(name, width, height)) // check if already in list
 		return;
 
@@ -645,8 +670,22 @@ static void Mod_GetWalSize (const char *name, int *width, int *height)
 		Mod_AddToWalSizeList(name, *width, *height); // add to list
 		return;
 	}
+#if KINGPIN
+	{
+		byte  *data;
+		data = mt;
+		data+=12; //header
+		*width = (int)LittleShort( *((short *)data) );
+		data+=2;
+		*height = (int)LittleShort( *((short *)data) );
+
+		//*width = LittleLong(mt->width); // grab size from tga
+		//*height = LittleLong (mt->height);
+	}
+#else
 	*width = LittleLong (mt->width); // grab size from wal
 	*height = LittleLong (mt->height);
+#endif
 	FS_FreeFile ((void *)mt); // free the wal
 
 	Mod_AddToWalSizeList(name, *width, *height); // add to list
@@ -660,11 +699,12 @@ Mod_LoadTexinfo
 */
 void Mod_LoadTexinfo (lump_t *l)
 {
-	texinfo_t *in;
+	texinfo_q2_t *in;
 	mtexinfo_t *out, *step;
 	int 	i, j, count;
 	char	name[MAX_QPATH];
 	int		next;
+	qboolean hirez = true;
 
 	in = (void *)(mod_base + l->fileofs);
 	if (l->filelen % sizeof(*in))
@@ -686,9 +726,24 @@ void Mod_LoadTexinfo (lump_t *l)
 			out->next = loadmodel->texinfo + next;
 		else
 		    out->next = NULL;
-
+#if KINGPIN
+		//try load png first. higher rez?
+		Com_sprintf (name, sizeof(name), "textures/%s.png", in->texture);
+#else
 		Com_sprintf (name, sizeof(name), "textures/%s.wal", in->texture);
+#endif
 		out->image = Mod_FindTexture (name, it_wall); // was R_FindImage
+#if KINGPIN
+		if (!out->image || out->image == glMedia.notexture)
+		{
+			Com_sprintf(name, sizeof(name), "textures/%s.tga", in->texture);
+			out->image = Mod_FindTexture(name, it_wall); // was R_FindImage
+			hirez = false;
+			out->texWidth = out->texHeight = -1;
+		}
+		else
+			hirez = true;
+#endif
 
 		if (!out->image)
 		{
@@ -697,7 +752,11 @@ void Mod_LoadTexinfo (lump_t *l)
 		}
 
 		// Added glow
+#if KINGPIN
+		Com_sprintf (name, sizeof(name), "textures/%s_glow.tga", in->texture);
+#else
 		Com_sprintf (name, sizeof(name), "textures/%s_glow.wal", in->texture);
+#endif
 		out->glow = Mod_FindTexture (name, it_skin); // was R_FindImage
 		if (!out->glow)
 			out->glow = glMedia.notexture;
@@ -706,7 +765,8 @@ void Mod_LoadTexinfo (lump_t *l)
 		// NOTE: Once Q3 map support is added, be be sure to disable this
 		// for Q3 format maps, because they will be natively textured with
 		// hi-res textures.
-		Mod_GetWalSize (in->texture, &out->texWidth, &out->texHeight);
+		//if (hirez)
+			Mod_GetWalSize (in->texture, &out->texWidth, &out->texHeight);
 
 		// If no .wal texture was found, use width & height of actual texture
 		if (out->texWidth == -1 || out->texHeight == -1)
@@ -737,7 +797,7 @@ void CalcSurfaceExtents (msurface_t *s)
 {
 	float	mins[2], maxs[2], val;
 	int		i,j, e;
-	mvertex_t	*v;
+	mvertex_q2_t	*v;
 	mtexinfo_t	*tex;
 	int		bmins[2], bmaxs[2];
 
@@ -900,7 +960,7 @@ Mod_LoadNodes
 void Mod_LoadNodes (lump_t *l)
 {
 	int			i, j, count, p;
-	dnode_t		*in;
+	dnode_q2_t		*in;
 	mnode_t 	*out;
 
 	in = (void *)(mod_base + l->fileofs);
@@ -947,7 +1007,7 @@ Mod_LoadLeafs
 */
 void Mod_LoadLeafs (lump_t *l)
 {
-	dleaf_t 	*in;
+	dleaf_q2_t 	*in;
 	mleaf_t 	*out;
 	int			i, j, count, p;
 	glpoly_t	*poly;
@@ -1065,7 +1125,7 @@ void Mod_LoadPlanes (lump_t *l)
 {
 	int			i, j;
 	cplane_t	*out;
-	dplane_t 	*in;
+	dplane_q2_t 	*in;
 	int			count;
 	int			bits;
 	
@@ -1105,14 +1165,14 @@ Mod_LoadBrushModel
 void Mod_LoadBrushModel (model_t *mod, void *buffer)
 {
 	int			i;
-	dheader_t	*header;
+	dheader_q2_t	*header;
 	mmodel_t 	*bm;
 	
 	loadmodel->type = mod_brush;
 	if (loadmodel != mod_known)
 		VID_Error (ERR_DROP, "Loaded a brush model after the world");
 
-	header = (dheader_t *)buffer;
+	header = (dheader_q2_t *)buffer;
 
 	i = LittleLong (header->version);
 	if (i != BSPVERSION)
@@ -1121,22 +1181,22 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer)
 	// swap all the lumps
 	mod_base = (byte *)header;
 
-	for (i=0 ; i<sizeof(dheader_t)/4 ; i++)
+	for (i=0 ; i<sizeof(dheader_q2_t)/4 ; i++)
 		((int *)header)[i] = LittleLong ( ((int *)header)[i]);
 
 	// load into heap	
-	Mod_LoadVertexes (&header->lumps[LUMP_VERTEXES]);
-	Mod_LoadEdges (&header->lumps[LUMP_EDGES]);
-	Mod_LoadSurfedges (&header->lumps[LUMP_SURFEDGES]);
-	Mod_LoadLighting (&header->lumps[LUMP_LIGHTING]);
-	Mod_LoadPlanes (&header->lumps[LUMP_PLANES]);
-	Mod_LoadTexinfo (&header->lumps[LUMP_TEXINFO]);
-	Mod_LoadFaces (&header->lumps[LUMP_FACES]);
-	Mod_LoadMarksurfaces (&header->lumps[LUMP_LEAFFACES]);
-	Mod_LoadVisibility (&header->lumps[LUMP_VISIBILITY]);
-	Mod_LoadLeafs (&header->lumps[LUMP_LEAFS]);
-	Mod_LoadNodes (&header->lumps[LUMP_NODES]);
-	Mod_LoadSubmodels (&header->lumps[LUMP_MODELS]);
+	Mod_LoadVertexes (&header->lumps[LUMP_VERTEXES_Q2]);
+	Mod_LoadEdges (&header->lumps[LUMP_EDGES_Q2]);
+	Mod_LoadSurfedges (&header->lumps[LUMP_SURFEDGES_Q2]);
+	Mod_LoadLighting (&header->lumps[LUMP_LIGHTING_Q2]);
+	Mod_LoadPlanes (&header->lumps[LUMP_PLANES_Q2]);
+	Mod_LoadTexinfo (&header->lumps[LUMP_TEXINFO_Q2]);
+	Mod_LoadFaces (&header->lumps[LUMP_FACES_Q2]);
+	Mod_LoadMarksurfaces (&header->lumps[LUMP_LEAFFACES_Q2]);
+	Mod_LoadVisibility (&header->lumps[LUMP_VISIBILITY_Q2]);
+	Mod_LoadLeafs (&header->lumps[LUMP_LEAFS_Q2]);
+	Mod_LoadNodes (&header->lumps[LUMP_NODES_Q2]);
+	Mod_LoadSubmodels (&header->lumps[LUMP_MODELS_Q2]);
 	mod->numframes = 2;		// regular and alternate animation
 	
 	//
@@ -1796,9 +1856,192 @@ void Mod_LoadAliasMD2Model (model_t *mod, void *buffer)
 	mod->hasAlpha = false;
 	//Mod_LoadMD2ModelScript (mod, pheader); // md2 skin scripting
 
-	mod->type = mod_md2;
+	mod->type = mod_alias_md2;
 }
 #endif // MD2_AS_MD3
+
+#ifndef MDX_AS_MD3
+
+#ifdef PROJECTION_MDX_SHADOWS // projection shadows from BeefQuake R6
+/*
+=================
+Mod_FindMDXTriangleWithEdge
+=================
+*/
+signed int Mod_FindMDXTriangleWithEdge (short p1, short p2, triangle_mdx_t *ignore, header_mdx_t *hdr)
+{
+	triangle_mdx_t *tris = (triangle_mdx_t *)((unsigned char*)hdr + hdr->ofs_tris);
+	int i, match, count;
+
+	count = 0;
+	match = -1;
+
+	for (i=0; i<hdr->num_tris; i++, tris++)
+	{
+		if ( (tris->index_xyz[0] == p2 && tris->index_xyz[1] == p1)
+			|| (tris->index_xyz[1] == p2 && tris->index_xyz[2] == p1)
+			|| (tris->index_xyz[2] == p2 && tris->index_xyz[0] == p1) ) {
+			if (tris != ignore)
+				match = i;
+			count++;
+		}
+		else if ( (tris->index_xyz[0] == p1 && tris->index_xyz[1] == p2)
+			|| (tris->index_xyz[1] == p1 && tris->index_xyz[2] == p2)
+			|| (tris->index_xyz[2] == p1 && tris->index_xyz[0] == p2) )
+			count++;
+	}
+
+	if (count > 2)
+		match = -1;
+	return match;
+}
+
+/*
+=================
+Mod_BuildMDXTriangleNeighbors
+=================
+*/
+void Mod_BuildMDXTriangleNeighbors (model_t *mod)
+{
+	header_mdx_t		*hdr = (header_mdx_t *)mod->extradata;
+	triangle_mdx_t *tris = (triangle_mdx_t *)((unsigned char*)hdr + hdr->ofs_tris);
+	int			i, *n;
+
+	for (i=0, n=mod->edge_mdx_tri; i<hdr->num_tris; i++, n+=3, tris++)
+	{
+		n[0] = Mod_FindMDXTriangleWithEdge(tris->index_xyz[0], tris->index_xyz[1], tris, hdr);
+		n[1] = Mod_FindMDXTriangleWithEdge(tris->index_xyz[1], tris->index_xyz[2], tris, hdr);
+		n[2] = Mod_FindMDXTriangleWithEdge(tris->index_xyz[2], tris->index_xyz[0], tris, hdr);
+	}
+}
+#endif // end projection shadows from BeefQuake R6
+
+/*
+=================
+Mod_LoadAliasMDXModel
+=================
+*/
+void Mod_LoadAliasMDXModel (model_t *mod, void *buffer)
+{
+	int					i, j;
+	header_mdx_t		*pinmodel, *pheader;
+	//stvert_mdx_t		*pinst, *poutst;
+	triangle_mdx_t		*pintri, *pouttri;
+	aliasframe_mdx_t	*pinframe, *poutframe;
+	int					*pincmd, *poutcmd;
+	int					version;
+
+	pinmodel = (header_mdx_t *)buffer;
+
+	version = LittleLong (pinmodel->version);
+	if (version != ALIAS_MDX_VERSION)
+		VID_Error (ERR_DROP, "%s has wrong version number (%i should be %i)",
+				 mod->name, version, ALIAS_MDX_VERSION);
+
+	pheader = Hunk_Alloc (LittleLong(pinmodel->ofs_end));
+	
+	// byte swap the header fields and sanity check
+	for (i=0; i<sizeof(header_mdx_t)/4; i++)
+		((int *)pheader)[i] = LittleLong (((int *)buffer)[i]);
+
+	if (pheader->skinheight > MAX_LBM_HEIGHT)
+		VID_Error (ERR_DROP, "model %s has a skin taller than %d", mod->name,
+				   MAX_LBM_HEIGHT);
+
+	if (pheader->num_vert <= 0)
+		VID_Error (ERR_DROP, "model %s has no vertices", mod->name);
+
+	if (pheader->num_vert > MAX_MDX_VERTS)
+		VID_Error (ERR_DROP, "model %s has too many vertices", mod->name);
+
+	if (pheader->num_tris <= 0)
+		VID_Error (ERR_DROP, "model %s has no triangles", mod->name);
+
+	if (pheader->num_frames <= 0)
+		VID_Error (ERR_DROP, "model %s has no frames", mod->name);
+
+	//
+	// load base s and t vertices (not used in gl version)
+	//
+	/*pinst = (stvert_mdx_t *) ((byte *)pinmodel + pheader->ofs_st);
+	poutst = (stvert_mdx_t *) ((byte *)pheader + pheader->ofs_st);
+
+	for (i=0; i<pheader->num_st; i++)
+	{
+		poutst[i].s = LittleShort (pinst[i].s);
+		poutst[i].t = LittleShort (pinst[i].t);
+	}*/
+
+	//
+	// load triangle lists
+	//
+	pintri = (triangle_mdx_t *) ((byte *)pinmodel + pheader->ofs_tris);
+	pouttri = (triangle_mdx_t *) ((byte *)pheader + pheader->ofs_tris);
+
+	for (i=0; i<pheader->num_tris; i++)
+	{
+		for (j=0; j<3; j++)
+		{
+			pouttri[i].index_xyz[j] = LittleShort (pintri[i].index_xyz[j]);
+			pouttri[i].index_st[j] = LittleShort (pintri[i].index_st[j]);
+		}
+	}
+
+	//
+	// load the frames
+	//
+	for (i=0; i<pheader->num_frames; i++)
+	{
+		pinframe = (aliasframe_mdx_t *) ((byte *)pinmodel 
+			+ pheader->ofs_frames + i * pheader->framesize);
+		poutframe = (aliasframe_mdx_t *) ((byte *)pheader 
+			+ pheader->ofs_frames + i * pheader->framesize);
+
+		memcpy (poutframe->name, pinframe->name, sizeof(poutframe->name));
+		for (j=0 ; j<3 ; j++)
+		{
+			poutframe->scale[j] = LittleFloat (pinframe->scale[j]);
+			poutframe->translate[j] = LittleFloat (pinframe->translate[j]);
+		}
+		// verts are all 8 bit, so no swapping needed
+		memcpy (poutframe->verts, pinframe->verts, 
+			pheader->num_vert*sizeof(trivertx_mdx_t));
+	}
+
+	//
+	// load the glcmds
+	//
+	pincmd = (int *) ((byte *)pinmodel + pheader->ofs_glcmds);
+	poutcmd = (int *) ((byte *)pheader + pheader->ofs_glcmds);
+	for (i=0; i<pheader->num_glcmds; i++)
+		poutcmd[i] = LittleLong (pincmd[i]);
+
+	// register all skins
+	memcpy ((char *)pheader + pheader->ofs_skins, (char *)pinmodel + pheader->ofs_skins,
+		pheader->num_skins*MAX_MDX_SKINNAME);
+	for (i=0; i<pheader->num_skins; i++)
+	{
+		mod->skins[0][i] = R_FindImage ((char *)pheader + pheader->ofs_skins + i*MAX_MDX_SKINNAME, it_skin);
+	}
+
+	mod->mins[0] = -32;
+	mod->mins[1] = -32;
+	mod->mins[2] = -32;
+	mod->maxs[0] = 32;
+	mod->maxs[1] = 32;
+	mod->maxs[2] = 32;
+
+#ifdef PROJECTION_MDX_SHADOWS // projection shadows from BeefQuake R6
+	mod->edge_mdx_tri = malloc(sizeof(int) * pheader->num_tris * 3);
+	Mod_BuildMDXTriangleNeighbors (mod);
+#endif // end projection shadows from BeefQuake R6
+
+	mod->hasAlpha = false;
+	//Mod_LoadMDXModelScript (mod, pheader); // mdx skin scripting
+
+	mod->type = mod_alias_mdx;
+}
+#endif // MDX_AS_MD3
 
 
 //Harven++ MD3
@@ -1902,10 +2145,11 @@ void Mod_LoadAliasMD2ModelNew (model_t *mod, void *buffer)
 {
 	int					i, j;
 	int					version;
-	dmdl_t				*pinmodel;
-	daliasframe_t		*pinframe;
-	dtriangle_t			*pintri;
-	dstvert_t			*pincoord;
+	header_md2_t		*pinmodel;
+	aliasframe_md2_t	*pinframe;
+	triangle_md2_t		*pintri;
+	stvert_md2_t		*pincoord;
+
 	maliasmodel_t		*poutmodel;
 	maliasframe_t		*poutframe;
 	maliasmesh_t		*poutmesh;
@@ -1914,25 +2158,25 @@ void Mod_LoadAliasMD2ModelNew (model_t *mod, void *buffer)
 	maliascoord_t		*poutcoord;
 	index_t				*poutindex;
 	char				name[MD3_MAX_PATH];
-	int					indRemap[MAX_TRIANGLES*3];
-	unsigned			tempIndex[MAX_TRIANGLES*3], tempStIndex[MAX_TRIANGLES*3];
+	int					indRemap[MAX_MD2_TRIANGLES*3];
+	unsigned			tempIndex[MAX_MD2_TRIANGLES*3], tempStIndex[MAX_MD2_TRIANGLES*3];
 	int					numIndices, numVertices;
 	double				skinWidth, skinHeight;
 	vec3_t				normal;
 
-	pinmodel = (dmdl_t *)buffer;
+	pinmodel = (header_md2_t *)buffer;
 
-	poutmodel = Hunk_Alloc (sizeof(maliasmodel_t));
+	poutmodel = Hunk_Alloc (sizeof(maliasmodel_t)); //24
 
 	// byte swap the header fields and sanity check
 	version = LittleLong (pinmodel->version);
-	if (version != ALIAS_VERSION) {
+	if (version != ALIAS_MD2_VERSION) {
 		VID_Error (ERR_DROP, "%s has wrong version number (%i should be %i)",
-				 mod->name, version, ALIAS_VERSION);
+				 mod->name, version, ALIAS_MD2_VERSION);
 	}
 
 	poutmodel->num_frames = LittleLong ( pinmodel->num_frames );
-	if (poutmodel->num_frames > MAX_FRAMES || poutmodel->num_frames <= 0)
+	if (poutmodel->num_frames > MAX_MD2_FRAMES || poutmodel->num_frames <= 0)
 		VID_Error (ERR_DROP, "model %s has invalid number of frames (%i)", mod->name, poutmodel->num_frames);
 
 	poutmodel->num_tags = 0;
@@ -1944,23 +2188,23 @@ void Mod_LoadAliasMD2ModelNew (model_t *mod, void *buffer)
 	//
 	// load mesh info
 	//
-	poutmesh = poutmodel->meshes = Hunk_Alloc(sizeof(maliasmesh_t));
+	poutmesh = poutmodel->meshes = Hunk_Alloc(sizeof(maliasmesh_t)); //96
 
 	Com_sprintf(poutmesh->name, sizeof(poutmesh->name), "md2mesh"); // mesh name in script must match this
 
 	poutmesh->num_tris = LittleLong(pinmodel->num_tris);
-	if (poutmesh->num_tris > MAX_TRIANGLES || poutmesh->num_tris <= 0)
+	if (poutmesh->num_tris > MAX_MD2_TRIANGLES || poutmesh->num_tris <= 0)
 		VID_Error (ERR_DROP, "model %s has invalid number of triangles (%i)", mod->name, poutmesh->num_tris);
 
 	poutmesh->num_verts = LittleLong(pinmodel->num_xyz);
-	if (poutmesh->num_verts > MAX_VERTS || poutmesh->num_verts <= 0)
+	if (poutmesh->num_verts > MAX_MD2_VERTS || poutmesh->num_verts <= 0)
 		VID_Error (ERR_DROP, "model %s has invalid number of vertices (%i)", mod->name, poutmesh->num_verts);
 
 	poutmesh->num_skins = LittleLong(pinmodel->num_skins);
-	if (poutmesh->num_skins > MAX_MD2SKINS || poutmesh->num_skins < 0)
+	if (poutmesh->num_skins > MAX_MD2_SKINS || poutmesh->num_skins < 0)
 		Com_Error(ERR_DROP, "model %s has invalid number of skins (%i)", mod->name, poutmesh->num_skins);
 
-	pintri = (dtriangle_t *)((byte *)pinmodel + LittleLong(pinmodel->ofs_tris));
+	pintri = (triangle_md2_t *)((byte *)pinmodel + LittleLong(pinmodel->ofs_tris));
 
 	for (i=0; i < poutmesh->num_tris; i++)
 	{
@@ -1979,9 +2223,9 @@ void Mod_LoadAliasMD2ModelNew (model_t *mod, void *buffer)
 	numIndices = poutmesh->num_tris * 3;
 	numVertices = 0;
 
-	poutindex = poutmesh->indexes = Hunk_Alloc( sizeof(index_t) * poutmesh->num_tris * 3 );
+	poutindex = poutmesh->indexes = Hunk_Alloc( sizeof(index_t) * poutmesh->num_tris * 3 ); //4 x 4096 x 3= 49152
 
-	memset(indRemap, -1, MAX_TRIANGLES * 3 * sizeof(int));
+	memset(indRemap, -1, MAX_MD2_TRIANGLES * 3 * sizeof(int));
 
 	for (i=0; i < numIndices; i++)
 	{
@@ -2019,8 +2263,8 @@ void Mod_LoadAliasMD2ModelNew (model_t *mod, void *buffer)
 	//
 	// load base S and T vertices
 	//
-	pincoord = (dstvert_t *)((byte *)pinmodel + LittleLong(pinmodel->ofs_st));
-	poutcoord = poutmesh->stcoords = Hunk_Alloc ( sizeof(maliascoord_t) * poutmesh->num_verts );
+	pincoord = (stvert_md2_t *)((byte *)pinmodel + LittleLong(pinmodel->ofs_st));
+	poutcoord = poutmesh->stcoords = Hunk_Alloc ( sizeof(maliascoord_t) * poutmesh->num_verts ); //8 x 2048 = 16384
 
 	for (i=0; i < numIndices; i++) {
 		poutcoord[poutindex[i]].st[0] = (float)(((double)LittleShort(pincoord[tempStIndex[indRemap[i]]].s) + 0.5) * skinWidth);
@@ -2030,15 +2274,15 @@ void Mod_LoadAliasMD2ModelNew (model_t *mod, void *buffer)
 	//
 	// load the frames
 	//
-	poutframe = poutmodel->frames = Hunk_Alloc ( sizeof(maliasframe_t) * poutmodel->num_frames );
-	poutvert = poutmesh->vertexes = Hunk_Alloc ( poutmodel->num_frames * poutmesh->num_verts * sizeof(maliasvertex_t) );
+	poutframe = poutmodel->frames = Hunk_Alloc ( sizeof(maliasframe_t) * poutmodel->num_frames ); //25 x 512 = 26624
+	poutvert = poutmesh->vertexes = Hunk_Alloc ( poutmodel->num_frames * poutmesh->num_verts * sizeof(maliasvertex_t) ); //512 x 2048 x 9 = 9437184
 
 	mod->radius = 0;
 	ClearBounds(mod->mins, mod->maxs);
 
 	for (i=0; i < poutmodel->num_frames; i++, pinframe++, poutframe++, poutvert += numVertices)
 	{
-		pinframe = (daliasframe_t *)((byte *)pinmodel + LittleLong(pinmodel->ofs_frames) + i*LittleLong(pinmodel->framesize));
+		pinframe = (aliasframe_md2_t *)((byte *)pinmodel + LittleLong(pinmodel->ofs_frames) + i*LittleLong(pinmodel->framesize));
 
 		poutframe->scale[0] = LittleFloat(pinframe->scale[0]);
 		poutframe->scale[1] = LittleFloat(pinframe->scale[1]);
@@ -2079,7 +2323,7 @@ void Mod_LoadAliasMD2ModelNew (model_t *mod, void *buffer)
 	//
 	// build triangle neighbors
 	//
-	poutmesh->trneighbors = Hunk_Alloc ( sizeof(int) * poutmesh->num_tris * 3 );
+	poutmesh->trneighbors = Hunk_Alloc ( sizeof(int) * poutmesh->num_tris * 3 ); //4 x 4096 = 16384
 	Mod_BuildTriangleNeighbors (poutmesh);
 
 	//
@@ -2096,10 +2340,10 @@ void Mod_LoadAliasMD2ModelNew (model_t *mod, void *buffer)
 	}
 	else
 	{
-		poutskin = poutmesh->skins = Hunk_Alloc ( sizeof(maliasskin_t) * poutmesh->num_skins );
+		poutskin = poutmesh->skins = Hunk_Alloc ( sizeof(maliasskin_t) * poutmesh->num_skins ); //64 x 32 = 2048
 		for (i=0; i < poutmesh->num_skins; i++, poutskin++)
 		{
-			memcpy(name, ((char *)pinmodel + LittleLong(pinmodel->ofs_skins) + i*MAX_SKINNAME), MD3_MAX_PATH);
+			memcpy(name, ((char *)pinmodel + LittleLong(pinmodel->ofs_skins) + i*MAX_MDX_SKINNAME), MD3_MAX_PATH);
 			memcpy(poutskin->name, name, MD3_MAX_PATH);
 			Com_sprintf(poutskin->glowname, sizeof(poutskin->glowname), "\0"); // set null glowskin
 			mod->skins[0][i] = R_FindImage (name, it_skin);
@@ -2112,9 +2356,299 @@ void Mod_LoadAliasMD2ModelNew (model_t *mod, void *buffer)
 	//if (mod->hasAlpha)
 	//	VID_Printf (PRINT_ALL, "Mod_LoadAliasMD2Model: model %s has trans mesh\n", mod->name);
 
-	mod->type = mod_alias;
+	mod->type = mod_alias_md3; //hypov8 converted md2
 }
 #endif // MD2_AS_MD3
+
+
+#if KINGPIN
+/*
+=================
+Mod_LoadAliasMDXModelNew
+hypov8
+=================
+*/
+void Mod_LoadAliasMDXModelNew (model_t *mod, void *buffer)
+{
+	int					i, j, f;
+	int					version;
+	d_mdx_head_t		*pinmodel;
+	d_mdx_frame_t		*pinframe;
+	d_mdx_tri_t			*pintri;
+	d_mdx_vert_t		*pin_VCoord;
+
+	maliasmodel_t		*poutmodel;
+	maliasframe_t		*poutframe;
+	maliasmesh_t		*poutmesh;
+	maliasskin_t		*poutskin;
+	maliasvertex_t		*poutvert;
+	maliascoord_t		*poutcoord;
+	index_t				*poutindex;
+
+	char				name[MD3_MAX_PATH];
+	int					indRemap[MAX_TRIANGLES_KP*3];
+	unsigned			tempTriIndex[MAX_TRIANGLES_KP*3], tempStIndex[MAX_TRIANGLES_KP*3];
+	int					numIndices, numVertices;
+	double				skinWidth, skinHeight;
+	vec3_t				normal;
+
+	d_mdx_glVert_t p_tmpGL_StID[MAX_TRIANGLES_KP * 3];
+	//p_in_glCmd; //gl command vertex
+	qboolean		glData = true;
+	int vtxCnt = 0;
+	int headerVerCnt = 0;
+	int headerCnt = 0;
+
+	pinmodel = (d_mdx_head_t *)buffer;
+
+	poutmodel = Hunk_Alloc (sizeof(maliasmodel_t)); // 24 byte
+
+	// byte swap the header fields and sanity check
+	version = LittleLong (pinmodel->version);
+	if (version != ALIAS_VERSION_KP) {
+		VID_Error (ERR_DROP, "%s has wrong version number (%i should be %i)",
+				 mod->name, version, ALIAS_VERSION_KP);
+	}
+
+	poutmodel->num_frames = LittleLong ( pinmodel->num_frames );
+	if (poutmodel->num_frames > MAX_FRAMES_KP || poutmodel->num_frames <= 0)
+		VID_Error (ERR_DROP, "model %s has invalid number of frames (%i)", mod->name, poutmodel->num_frames);
+
+	poutmodel->num_tags = 0;
+	poutmodel->num_meshes = 1; //hypov8 todo: mdx sub model?
+
+	skinWidth = 1.0 / (double)LittleLong(pinmodel->skinwidth);
+	skinHeight = 1.0 / (double)LittleLong(pinmodel->skinheight);
+
+	//
+	// load mesh info
+	//
+	poutmesh = poutmodel->meshes = Hunk_Alloc(sizeof(maliasmesh_t)); //76 byte
+
+	Com_sprintf(poutmesh->name, sizeof(poutmesh->name), "md2mesh"); // mesh name in script must match this
+
+	poutmesh->num_tris = LittleLong(pinmodel->num_tris);
+	if (poutmesh->num_tris > MAX_TRIANGLES_KP || poutmesh->num_tris <= 0)
+		VID_Error (ERR_DROP, "model %s has invalid number of triangles (%i)", mod->name, poutmesh->num_tris);
+
+	poutmesh->num_verts = LittleLong(pinmodel->num_verts);
+	if (poutmesh->num_verts > MAX_VERTS_KP || poutmesh->num_verts <= 0)
+		VID_Error (ERR_DROP, "model %s has invalid number of vertices (%i)", mod->name, poutmesh->num_verts);
+
+	poutmesh->num_skins = LittleLong(pinmodel->num_skins);
+	if (poutmesh->num_skins > MAX_MDXSKINS_KP || poutmesh->num_skins < 0)
+		Com_Error(ERR_DROP, "model %s has invalid number of skins (%i)", mod->name, poutmesh->num_skins);
+
+#define readUVIdx( src, dst, cnt, cnt2) (dst.gl_s=src.gl_s, dst.gl_t=src.gl_t, dst.gl_vIdx=src.gl_vIdx, cnt++, cnt2++)
+#define dupeUVIdx( src, dst, cnt)		(dst.gl_s=src.gl_s, dst.gl_t=src.gl_t, dst.gl_vIdx=src.gl_vIdx, cnt++)
+#define dupeUVIdx_(src, dst)			(dst.gl_s=src.gl_s, dst.gl_t=src.gl_t, dst.gl_vIdx=src.gl_vIdx)
+
+	//
+	// load the glcmds
+	//
+	while (glData)
+	{
+		d_mdx_glHeader_t *p_in_glCmd = (d_mdx_glHeader_t *)((byte *)pinmodel + LittleLong(pinmodel->ofs_glcmds) +(sizeof(d_mdx_glHeader_t)*headerCnt) + (sizeof(d_mdx_glVert_t)*headerVerCnt) );
+		int TrisTypeNum = p_in_glCmd->TrisTypeNum ;// LittleLong(p_in_glCmd);
+		int SubObjectID = p_in_glCmd->SubObjectID;// LittleLong(p_in_glCmd); //hypov8 todo: ?
+		int glCnt;
+		int glVIdx=0;
+
+		d_mdx_glVert_t *p_in_glVCmd = (d_mdx_glVert_t*)( (byte*)pinmodel + LittleLong(pinmodel->ofs_glcmds) +(sizeof(d_mdx_glHeader_t)*(headerCnt+1)) + (sizeof(d_mdx_glVert_t)*headerVerCnt) );
+		headerCnt += 1;
+
+		//Triangle strip
+		if (TrisTypeNum > 0 && TrisTypeNum >= 3 && TrisTypeNum < MAX_VERTS_KP)
+		{
+			qboolean flip = false;
+			int back_1 = 2;
+			int back_2 = 1;
+			glCnt = TrisTypeNum;
+
+			//read first 3 vert. make 1 tri
+			readUVIdx(p_in_glVCmd[glVIdx], p_tmpGL_StID[vtxCnt], vtxCnt, glVIdx);
+			readUVIdx(p_in_glVCmd[glVIdx], p_tmpGL_StID[vtxCnt], vtxCnt, glVIdx);
+			readUVIdx(p_in_glVCmd[glVIdx], p_tmpGL_StID[vtxCnt], vtxCnt, glVIdx);
+
+			headerVerCnt += 3;
+
+			for (j = 3; j < glCnt; j++)
+			{
+				if (!flip)
+				{
+					//create new tri. vert build order -1,-2,0
+					dupeUVIdx(p_in_glVCmd[back_1], p_tmpGL_StID[vtxCnt], vtxCnt);
+					dupeUVIdx(p_in_glVCmd[back_2], p_tmpGL_StID[vtxCnt], vtxCnt);
+					readUVIdx(p_in_glVCmd[glVIdx], p_tmpGL_StID[vtxCnt], vtxCnt, glVIdx);
+				}
+				else
+				{
+					//create new tri. vert build order -2,-1,0
+					dupeUVIdx(p_in_glVCmd[back_2], p_tmpGL_StID[vtxCnt], vtxCnt);
+					dupeUVIdx(p_in_glVCmd[back_1], p_tmpGL_StID[vtxCnt], vtxCnt);
+					readUVIdx(p_in_glVCmd[glVIdx], p_tmpGL_StID[vtxCnt], vtxCnt, glVIdx);
+				}
+				headerVerCnt += 1;			
+				flip = flip ? false : true;
+				back_1 = glVIdx - 1;
+				back_2 = glVIdx - 2;
+			}
+		}
+		//Triangle fan
+		else if (TrisTypeNum < 0 && TrisTypeNum <= -3 && TrisTypeNum > -MAX_VERTS_KP)
+		{
+			int triMid = glVIdx;
+			int triDup = 2;
+			glCnt = -TrisTypeNum; //invert
+
+			readUVIdx(p_in_glVCmd[glVIdx], p_tmpGL_StID[vtxCnt], vtxCnt, glVIdx); //read vert 1
+			readUVIdx(p_in_glVCmd[glVIdx], p_tmpGL_StID[vtxCnt], vtxCnt, glVIdx); //read vert 2
+			readUVIdx(p_in_glVCmd[glVIdx], p_tmpGL_StID[vtxCnt], vtxCnt, glVIdx); //read vert 3
+			headerVerCnt += 3;
+
+			//read next vertex 3++
+			for (j = 3; j < glCnt;j++)
+			{
+				readUVIdx(p_in_glVCmd[glVIdx], p_tmpGL_StID[vtxCnt], vtxCnt, glVIdx); //read next
+				dupeUVIdx(p_in_glVCmd[triMid], p_tmpGL_StID[vtxCnt], vtxCnt); //duplicate (centre)
+				dupeUVIdx(p_in_glVCmd[triDup], p_tmpGL_StID[vtxCnt], vtxCnt); //duplicate (prev)
+				headerVerCnt += 1;	
+				triDup = glVIdx-1;
+			}
+		}
+		else
+			glData = false;//done. This will also catch some vertex count errors
+	}
+
+	numVertices= poutmesh->num_tris * 3;
+	poutmesh->num_verts = numVertices;
+
+	//hypov8 catch invalid model?
+	 if (numVertices != vtxCnt)
+		 Com_Error(ERR_DROP, "ERROR: GL vertex count does not match headder in %s", mod->name);
+
+
+	 //
+	 // load the frames
+	 //
+	 {
+		 int sze1 = sizeof(maliasframe_t);
+		 int sze2 = sizeof(maliasvertex_t);
+		 int sze3 = sizeof(index_t);
+		 int sze4 = sizeof(maliascoord_t);
+
+		 sze1= sze1;
+
+	 }
+	poutframe = poutmodel->frames = Hunk_Alloc ( sizeof(maliasframe_t)*poutmodel->num_frames ); // 52* 1024= 53248 byte
+	poutvert = poutmesh->vertexes = Hunk_Alloc ( sizeof(maliasvertex_t)*(poutmesh->num_verts * poutmodel->num_frames) ); //10 x (2048x1024)= 20971520 byte
+	poutindex = poutmesh->indexes = Hunk_Alloc ( sizeof(index_t)*(poutmesh->num_tris * 3) );	// 4x (4096 x3)= 49,152 byte
+	poutcoord = poutmesh->stcoords = Hunk_Alloc ( sizeof(maliascoord_t)*poutmesh->num_verts ); // 8x 2048= 16,384
+
+
+	mod->radius = 0;
+	ClearBounds(mod->mins, mod->maxs);
+
+	for (f=0; f < poutmodel->num_frames; f++/*, pinframe++*/, poutframe++/*, poutvert += numVertices*/)
+	{
+		pinframe = (d_mdx_frame_t *)((byte *)pinmodel + LittleLong(pinmodel->ofs_frames) + f*LittleLong(pinmodel->framesize));
+
+		poutframe->scale[0] = LittleFloat(pinframe->scale[0]);
+		poutframe->scale[1] = LittleFloat(pinframe->scale[1]);
+		poutframe->scale[2] = LittleFloat(pinframe->scale[2]);
+
+		poutframe->translate[0] = LittleFloat(pinframe->translate[0]);
+		poutframe->translate[1] = LittleFloat(pinframe->translate[1]);
+		poutframe->translate[2] = LittleFloat(pinframe->translate[2]);
+
+		VectorCopy (poutframe->translate, poutframe->mins);
+		VectorMA (poutframe->translate, 255, poutframe->scale, poutframe->maxs);
+
+		poutframe->radius = RadiusFromBounds(poutframe->mins, poutframe->maxs);
+
+		mod->radius = max ( mod->radius, poutframe->radius );
+		AddPointToBounds(poutframe->mins, mod->mins, mod->maxs);
+		AddPointToBounds(poutframe->maxs, mod->mins, mod->maxs);
+
+		//
+		// load vertex, UV and normals
+		//
+
+		//build tri from vertex GLlist. reverse tri winding
+		for (i = 0; i < vtxCnt; i += 3)
+		{
+			for (int j = 0; j <3; j++)
+			{
+				int order = i+j;
+				int vIdx = p_tmpGL_StID[order].gl_vIdx; //get ref vertex IndexID
+				int outCnt = order+(f*vtxCnt);// +(i*vtxCnt); //add (frame# * vert#)
+
+				//get vert location by indexID
+				poutvert[outCnt].xyz[0] = (short)(pinframe->vert_data[vIdx].v_Pos[0]);
+				poutvert[outCnt].xyz[1] = (short)(pinframe->vert_data[vIdx].v_Pos[1]);
+				poutvert[outCnt].xyz[2] = (short)(pinframe->vert_data[vIdx].v_Pos[2]);
+				poutvert[outCnt].lightnormalindex =	pinframe->vert_data[vIdx].v_normID;	
+				
+				//copy q2 normal index array
+				normal[0] = r_avertexnormals[poutvert[outCnt].lightnormalindex][0];
+				normal[1] = r_avertexnormals[poutvert[outCnt].lightnormalindex][1];
+				normal[2] = r_avertexnormals[poutvert[outCnt].lightnormalindex][2];
+				NormalToLatLong(normal, poutvert[outCnt].normal);
+
+				//first frame only (setup mesh)
+				if (f == 0) 
+				{
+					//get uv location by index. 
+					poutcoord[outCnt].st[0] = p_tmpGL_StID[order].gl_s;
+					poutcoord[outCnt].st[1] = p_tmpGL_StID[order].gl_t;
+					poutindex[outCnt] = outCnt;
+				}
+			}
+		}
+	}
+
+
+	//
+	// build triangle neighbors
+	//
+	poutmesh->trneighbors = Hunk_Alloc ( sizeof(int) * (poutmesh->num_tris * 3) ); //4 x ( 4096 x 3) = 49,152 byte
+	Mod_BuildTriangleNeighbors (poutmesh);
+
+	//
+	// register all skins
+	//
+#if 1
+	if (poutmesh->num_skins <= 0) // hack for player models with no skin refs
+	{
+		poutskin = poutmesh->skins = Hunk_Alloc ( sizeof(maliasskin_t) * 1 );
+		poutmesh->num_skins = 1;
+		Com_sprintf(name, sizeof(name), "players/male/grunt.pcx");
+		memcpy(poutskin->name, name, MD3_MAX_PATH);
+		Com_sprintf(poutskin->glowname, sizeof(poutskin->glowname), "\0"); // set null glowskin
+		mod->skins[0][0] = R_FindImage (name, it_skin);
+	}
+	else
+	{
+		poutskin = poutmesh->skins = Hunk_Alloc ( sizeof(maliasskin_t) * poutmesh->num_skins ); //64 x 32 = 2,048 bytes
+		for (i=0; i < poutmesh->num_skins; i++, poutskin++)
+		{
+			memcpy(name, ((char *)pinmodel + LittleLong(pinmodel->ofs_skins) + i*MAX_SKINNAME_KP), MD3_MAX_PATH);
+			memcpy(poutskin->name, name, MD3_MAX_PATH);
+			Com_sprintf(poutskin->glowname, sizeof(poutskin->glowname), "\0"); // set null glowskin
+			mod->skins[0][i] = R_FindImage (name, it_skin);
+		}
+	}
+#endif
+	mod->hasAlpha = false;
+	Mod_LoadModelScript (mod, poutmodel); // md3 skin scripting
+
+	//if (mod->hasAlpha)
+	//	VID_Printf (PRINT_ALL, "Mod_LoadAliasMD2Model: model %s has trans mesh\n", mod->name);
+
+	//mod->type = mod_alias_mdx;
+	mod->type = mod_alias_md3; //hypov8 converted md2
+}
+#endif // MDX_AS_MD3
 
 
 //
@@ -2366,7 +2900,7 @@ void Mod_LoadAliasMD3Model (model_t *mod, void *buffer)
 	//if (mod->hasAlpha)
 	//	VID_Printf (PRINT_ALL, "Mod_LoadAliasMD3Model: model %s has trans mesh\n", mod->name);
 
-	mod->type = mod_alias;
+	mod->type = mod_alias_md3;
 }
 //Harven-- MD3
 
@@ -2400,9 +2934,9 @@ void Mod_LoadSpriteModel (model_t *mod, void *buffer)
 		VID_Error (ERR_DROP, "%s has wrong version number (%i should be %i)",
 				 mod->name, sprout->version, SPRITE_VERSION);
 
-	if (sprout->numframes > MAX_MD2SKINS)
+	if (sprout->numframes > MAX_MD2_SKINS)
 		VID_Error (ERR_DROP, "%s has too many frames (%i > %i)",
-				 mod->name, sprout->numframes, MAX_MD2SKINS);
+				 mod->name, sprout->numframes, MAX_MD2_SKINS);
 
 	// byte swap everything
 	for (i=0 ; i<sprout->numframes ; i++)
@@ -2411,7 +2945,7 @@ void Mod_LoadSpriteModel (model_t *mod, void *buffer)
 		sprout->frames[i].height = LittleLong (sprin->frames[i].height);
 		sprout->frames[i].origin_x = LittleLong (sprin->frames[i].origin_x);
 		sprout->frames[i].origin_y = LittleLong (sprin->frames[i].origin_y);
-		memcpy (sprout->frames[i].name, sprin->frames[i].name, MAX_SKINNAME);
+		memcpy (sprout->frames[i].name, sprin->frames[i].name, MAX_MD2_SKINNAME);
 		mod->skins[0][i] = R_FindImage (sprout->frames[i].name,
 			it_sprite);
 	}
@@ -2468,14 +3002,20 @@ struct model_s *R_RegisterModel (char *name)
 	model_t	*mod;
 	int		i;
 	dsprite_t	*sprout;
-	dmdl_t		*pheader;
+	header_md2_t		*pheader_md2;
+	header_mdx_t		*pheader_mdx;
 // Harven++ MD3
 	maliasmodel_t	*pheader3;
 // Harven-- MD3
 
 	// Knightmare- MD3 autoreplace code
+	// check if an md3 exists first
 	int len = strlen(name);
-	if (!strcmp(name+len-4, ".md2")) // look if we have a .md2 file
+	if (!strcmp(name+len-4, ".md2")// look if we have a .md2 file
+#if KINGPIN
+	||!strcmp(name+len-4, ".mdx")
+#endif
+		) 
 	{
 		char s[128];
 	//	strncpy(s,name);
@@ -2496,18 +3036,27 @@ struct model_s *R_RegisterModel (char *name)
 		if (mod->type == mod_sprite)
 		{
 			sprout = (dsprite_t *)mod->extradata;
-			for (i=0 ; i<sprout->numframes ; i++)
-				mod->skins[0][i] = R_FindImage (sprout->frames[i].name, it_sprite);
+			for (i = 0; i < sprout->numframes; i++)
+				mod->skins[0][i] = R_FindImage(sprout->frames[i].name, it_sprite);
 		}
-		else if (mod->type == mod_md2)
+		else if (mod->type == mod_alias_md2)
 		{
-			pheader = (dmdl_t *)mod->extradata;
-			for (i=0 ; i<pheader->num_skins ; i++)
-				mod->skins[0][i] = R_FindImage ((char *)pheader + pheader->ofs_skins + i*MAX_SKINNAME, it_skin);
-			mod->numframes = pheader->num_frames;
+			pheader_md2 = (header_md2_t *)mod->extradata;
+			for (i = 0; i < pheader_md2->num_skins; i++)
+				mod->skins[0][i] = R_FindImage((char *)pheader_md2 + pheader_md2->ofs_skins + i*MAX_MD2_SKINNAME, it_skin);
+			mod->numframes = pheader_md2->num_frames;
 		}
+#if KINGPIN
+		else if (mod->type == mod_alias_mdx)
+		{
+			pheader_mdx = (header_mdx_t *)mod->extradata;
+			for (i = 0; i < pheader_mdx->num_skins; i++)
+				mod->skins[0][i] = R_FindImage((char *)pheader_mdx + pheader_mdx->ofs_skins + i*MAX_MDX_SKINNAME, it_skin);
+			mod->numframes = pheader_mdx->num_frames;
+		}
+#endif
 		// Harven++ MD3
-		else if (mod->type == mod_alias)
+		else if (mod->type == mod_alias_md3)
 		{
 			int	k;
 
@@ -2578,6 +3127,11 @@ void Mod_Free (model_t *mod)
 #ifdef PROJECTION_SHADOWS // projection shadows from BeefQuake R6
 	if (mod->edge_tri)
 		free (mod->edge_tri);
+#endif // end projection shadows from BeefQuake R6
+
+#ifdef PROJECTION_MDX_SHADOWS // projection shadows from BeefQuake R6
+	if (mod->edge_mdx_tri)
+		free (mod->edge_mdx_tri);
 #endif // end projection shadows from BeefQuake R6
 
 	memset (mod, 0, sizeof(*mod));

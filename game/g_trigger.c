@@ -78,7 +78,7 @@ void Use_Multi (edict_t *ent, edict_t *other, edict_t *activator)
 	multi_trigger (ent);
 }
 
-void Touch_Multi (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void Touch_Multi (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if(other->client || (other->flags & FL_ROBOT))
 	{
@@ -457,7 +457,7 @@ trigger_push
 
 static int windsound;
 
-void trigger_push_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void trigger_push_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if (strcmp(other->classname, "grenade") == 0)
 	{
@@ -539,7 +539,7 @@ It does dmg points of damage each server frame
 #define SF_HURT_NOGIB          32  // Lazarus: won't gib entity
 #define SF_HURT_ENVIRONMENT    64  // Lazarus: environment suit protects from damage
 
-void hurt_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf);
+void hurt_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf);
 void hurt_use (edict_t *self, edict_t *other, edict_t *activator)
 {
 	if (self->solid == SOLID_NOT)
@@ -566,7 +566,7 @@ void hurt_use (edict_t *self, edict_t *other, edict_t *activator)
 }
 
 
-void hurt_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void hurt_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	int		dflags;
 
@@ -670,7 +670,7 @@ the value of "gravity".  1.0 is standard
 gravity for the level.
 */
 
-void trigger_gravity_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void trigger_gravity_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	other->gravity = self->gravity;
 }
@@ -704,7 +704,7 @@ Walking monsters that touch this will jump in the direction of the trigger's ang
 "height" default to 200, the speed thrown upwards
 */
 
-void trigger_monsterjump_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void trigger_monsterjump_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if (other->flags & (FL_FLY | FL_SWIM) )
 		return;
@@ -820,7 +820,7 @@ void SP_tremor_trigger_multiple (edict_t *ent)
 // TRIGGER_MASS - triggers its targets when touched by any entity with mass >= mass value
 //                of trigger
 //=========================================================================================
-void trigger_mass_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void trigger_mass_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if(other->mass < self->mass) return;
 	self->activator = other;
@@ -1041,7 +1041,7 @@ void trigger_bbox_die (edict_t *self, edict_t *inflictor, edict_t *attacker, int
 	gi.linkentity(self);
 }
 
-void trigger_bbox_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void trigger_bbox_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if(self->nextthink)
 		return;					// already "touched" and waiting
@@ -1164,7 +1164,7 @@ void SP_trigger_bbox (edict_t *ent)
 // 2) Player must be looking at a point within bleft-tright of the origin of the trigger_look
 // 3) If USE spawnflag (=8) is set, player must be pressing +use to trigger
 
-void trigger_look_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void trigger_look_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	trace_t	tr;
 	vec_t	dist;
@@ -1745,7 +1745,7 @@ Remove - trigger removes disguise
 #define TRIGGER_DISGUISE_START_ON	2
 #define TRIGGER_DISGUISE_REMOVE		4
 
-void touch_trigger_disguise (edict_t *trigger, edict_t *other, cplane_t *plane, csurface_t *surf)
+void touch_trigger_disguise (edict_t *trigger, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if (!other->client) // this only works for players
 		return;
@@ -2000,7 +2000,7 @@ void trigger_switch (edict_t *ent)
 	}
 }
 
-void touch_trigger_switch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void touch_trigger_switch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	if(other->client || (other->flags & FL_ROBOT))
 	{

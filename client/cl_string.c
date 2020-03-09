@@ -157,7 +157,7 @@ qboolean StringSetParams (char modifier, int *red, int *green, int *blue, int *b
 DrawStringGeneric
 ================
 */
-void DrawStringGeneric (int x, int y, const char *string, int alpha, textscaletype_t scaleType, qboolean altBit)
+void DrawStringGeneric (int x, int y, const char *string, int alpha, textscaletype_t scaleType, qboolean altBit, int R, int G, int B)
 {
 	unsigned i, j;
 	char modifier, character;
@@ -172,13 +172,19 @@ void DrawStringGeneric (int x, int y, const char *string, int alpha, textscalety
 	italic = false;
 	shadow = false;
 	bold = false;
+#if KINGPIN
+	if(R != -1)	red = R;
+	if(G != -1)	green = G;
+	if(B != -1)	blue = B;
+#endif
 
 	len = strlen( string );
 	for ( i = 0, j = 0; i < len; i++ )
 	{
 		modifier = string[i];
-		if (modifier&128) modifier &= ~128;
-
+		if (modifier&128) 
+			modifier &= ~128;
+//#if !KINGPIN //hypov8 todo: disable this? SCR_ShowFPS?
 		if (modifier == '^' && i < len)
 		{
 			i++;
@@ -206,6 +212,7 @@ void DrawStringGeneric (int x, int y, const char *string, int alpha, textscalety
 					i--;
 			}
 		}
+//#endif
 		j++;
 
 		character = string[i];
@@ -220,6 +227,12 @@ void DrawStringGeneric (int x, int y, const char *string, int alpha, textscalety
 			textSize = SCR_ScaledVideo(MENU_FONT_SIZE);
 			textScale = SCR_VideoScale();
 			break;
+#if KINGPIN
+		case SCALETYPE_SCORE:
+			textSize = FONT_SIZE_SCORE;
+			textScale = FONT_SCALE_SCORE;
+			break;
+#endif
 		case SCALETYPE_HUD:
 			textSize = scaledHud(HUD_FONT_SIZE);
 			textScale = HudScale();

@@ -137,7 +137,11 @@ void ValidateSaveshots (void)
 		if ( m_savevalid[i] )
 		{
 			if (i == 0)
-				Com_sprintf(shotname, sizeof(shotname), "/levelshots/%s.pcx", m_mapname);
+#if KINGPIN
+				Com_sprintf(shotname, sizeof(shotname), "/%s/%s.tga", UI_MAP_SCRN_DIR, m_mapname);
+#else
+				Com_sprintf(shotname, sizeof(shotname), "/%s/%s.pcx", UI_MAP_SCRN_DIR, m_mapname);
+#endif
 			else
 			{	// free previously loaded shots
 				Com_sprintf(shotname, sizeof(shotname), "save/kmq2save%i/shot.jpg", i);
@@ -155,7 +159,7 @@ void ValidateSaveshots (void)
 /*	if (loadmenu)
 	{	// register mapshot for autosave
 		if (m_savevalid[0]) {
-			Com_sprintf(mapshotname, sizeof(mapshotname), "/levelshots/%s.pcx", m_mapname);
+			Com_sprintf(mapshotname, sizeof(mapshotname), "/%s/%s.pcx", UI_MAP_SCRN_DIR, m_mapname);
 			if (R_DrawFindPic(mapshotname))
 				m_mapshotvalid = true;
 			else
@@ -166,7 +170,7 @@ void ValidateSaveshots (void)
 	}
 
 	// register null saveshot, this is only done once
-	if (R_DrawFindPic("/gfx/ui/noscreen.pcx"))
+	if (R_DrawFindPic(UI_NOSCREEN_NAME))
 		m_saveshotvalid[MAX_SAVEGAMES] = true;
 	else
 		m_saveshotvalid[MAX_SAVEGAMES] = false;
@@ -192,7 +196,7 @@ void UI_InitSavegameData (void)
 	ValidateSaveshots ();	// register saveshots
 
 	// register null saveshot, this is only done once
-	if (R_DrawFindPic("/gfx/ui/noscreen.pcx"))
+	if (R_DrawFindPic(UI_NOSCREEN_NAME))
 		m_saveshotvalid[MAX_SAVEGAMES] = true;
 	else
 		m_saveshotvalid[MAX_SAVEGAMES] = false;
@@ -213,7 +217,7 @@ void DrawSaveshot (qboolean loadmenu)
 
 	if ( loadmenu && i==0 && m_savevalid[i] && m_saveshotvalid[i])	// m_mapshotvalid ) // autosave shows mapshot
 	{
-		Com_sprintf(mapshotname, sizeof(mapshotname), "/levelshots/%s.pcx", m_mapname);
+		Com_sprintf(mapshotname, sizeof(mapshotname), "/%s/%s.pcx", UI_MAP_SCRN_DIR, m_mapname);
 
 		SCR_DrawPic (SCREEN_WIDTH/2+46, SCREEN_HEIGHT/2-58, 240, 180, ALIGN_CENTER, mapshotname, 1.0);
 	}
@@ -224,7 +228,7 @@ void DrawSaveshot (qboolean loadmenu)
 		SCR_DrawPic (SCREEN_WIDTH/2+46, SCREEN_HEIGHT/2-58, 240, 180, ALIGN_CENTER, shotname, 1.0);
 	}
 	else if (m_saveshotvalid[MAX_SAVEGAMES])
-		SCR_DrawPic (SCREEN_WIDTH/2+46, SCREEN_HEIGHT/2-58, 240, 180, ALIGN_CENTER, "/gfx/ui/noscreen.pcx", 1.0);
+		SCR_DrawPic (SCREEN_WIDTH/2+46, SCREEN_HEIGHT/2-58, 240, 180, ALIGN_CENTER, UI_NOSCREEN_NAME, 1.0);
 	else
 		SCR_DrawFill (SCREEN_WIDTH/2+46, SCREEN_HEIGHT/2-58, 240, 180, ALIGN_CENTER, 0,0,0,255);
 }

@@ -43,8 +43,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define STAT_CTF_FLAG_PIC2			35 // Knightmare added
 #define STAT_CTF_TEAM3_HEADER		36 // Knightmare added
 
-#define CONFIG_CTF_MATCH (CS_AIRACCEL-1)
-#define CONFIG_CTF_TEAMINFO	(CS_AIRACCEL-2)
+#define CONFIG_CTF_MATCH (CS_AIRACCEL-1) //hypov8 todo:
+#define CONFIG_CTF_TEAMINFO	(CS_AIRACCEL-2) //hypov8 todo:
 
 typedef enum {
 	CTF_NOTEAM,

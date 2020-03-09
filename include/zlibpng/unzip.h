@@ -40,11 +40,6 @@
       ftp://ftp.pkware.com/probdesc.zip
 */
 
-#ifdef linux
-typedef unsigned long uLong;
-typedef unsigned int uInt;
-#endif
-
 #ifndef _unz_H
 #define _unz_H
 

@@ -43,11 +43,13 @@ void muzzleflash_think(edict_t *flash)
 
 void TraceAimPoint(vec3_t start,vec3_t target)
 {
+	#if !KINGPIN //hypov8 todo: dll
 	gi.WriteByte (svc_temp_entity);
 	gi.WriteByte (TE_DEBUGTRAIL);
 	gi.WritePosition (start);
 	gi.WritePosition (target);
 	gi.multicast (start, MULTICAST_ALL);
+#endif
 }
 void ActorTarget(edict_t *self, vec3_t target)
 {
@@ -205,12 +207,13 @@ void actorShotgun (edict_t *self)
 	VectorSubtract (target, start, forward);
 	VectorNormalize (forward);
 	fire_shotgun (self, start, forward, 4, 8, DEFAULT_SHOTGUN_HSPREAD, DEFAULT_SHOTGUN_VSPREAD, DEFAULT_SHOTGUN_COUNT, MOD_SHOTGUN);
-
+#if !KINGPIN //hypov8 todo: dll
 	gi.WriteByte(svc_temp_entity);
 	gi.WriteByte(TE_CHAINFIST_SMOKE);
 	gi.WritePosition(start);
 	gi.multicast(start, MULTICAST_PVS);
 	gi.positioned_sound(start,self,CHAN_WEAPON,gi.soundindex("weapons/shotgf1b.wav"),1,ATTN_NORM,0);
+#endif
 
 	if(self->flash)
 	{
@@ -261,13 +264,13 @@ void actorSuperShotgun (edict_t *self)
 	angles[YAW] += 10;
 	AngleVectors(angles,forward,NULL,NULL);
 	fire_shotgun (self, start, forward, 6, 12, DEFAULT_SHOTGUN_HSPREAD, DEFAULT_SHOTGUN_VSPREAD, DEFAULT_SSHOTGUN_COUNT/2, MOD_SSHOTGUN);
-
+#if !KINGPIN //hypov8 todo: dll
 	gi.WriteByte(svc_temp_entity);
 	gi.WriteByte(TE_CHAINFIST_SMOKE);
 	gi.WritePosition(start);
 	gi.multicast(start, MULTICAST_PVS);
 	gi.positioned_sound(start,self,CHAN_WEAPON,gi.soundindex("weapons/sshotf1b.wav"),1,ATTN_NORM,0);
-
+#endif
 	if(self->flash)
 	{
 		VectorCopy(start,self->flash->s.origin);
@@ -308,13 +311,13 @@ void actorMachineGun (edict_t *self)
 		damage = 4;
 
 	fire_bullet (self, start, forward, damage, 2, DEFAULT_BULLET_HSPREAD, DEFAULT_BULLET_VSPREAD, MOD_MACHINEGUN);
-
+#if !KINGPIN //hypov8 todo: dll
 	gi.WriteByte(svc_temp_entity);
 	gi.WriteByte(TE_CHAINFIST_SMOKE);
 	gi.WritePosition(start);
 	gi.multicast(start, MULTICAST_PVS);
 	gi.positioned_sound(start,self,CHAN_WEAPON,gi.soundindex(va("weapons/machgf%db.wav",self->actor_gunframe % 5 + 1)),1,ATTN_NORM,0);
-
+#endif
 	if(self->flash)
 	{
 		VectorCopy(start,self->flash->s.origin);
@@ -333,10 +336,12 @@ void actorMachineGun (edict_t *self)
 		VectorSubtract (target, start, forward);
 		VectorNormalize (forward);
 		fire_bullet (self, start, forward, damage, 2, DEFAULT_BULLET_HSPREAD, DEFAULT_BULLET_VSPREAD, MOD_MACHINEGUN);
+#if !KINGPIN //hypov8 todo: dll
 		gi.WriteByte(svc_temp_entity);
 		gi.WriteByte(TE_CHAINFIST_SMOKE);
 		gi.WritePosition(start);
 		gi.multicast(start, MULTICAST_PVS);
+#endif
 	}
 }
 
@@ -390,13 +395,13 @@ void actorChaingun (edict_t *self)
 
 	for(i=0; i<shots; i++)
 		fire_bullet (self, start, forward, damage, 2, DEFAULT_BULLET_HSPREAD, DEFAULT_BULLET_VSPREAD, MOD_CHAINGUN);
-
+	#if !KINGPIN //hypov8 todo: dll
 	gi.WriteByte(svc_temp_entity);
 	gi.WriteByte(TE_CHAINFIST_SMOKE);
 	gi.WritePosition(start);
 	gi.multicast(start, MULTICAST_PVS);
 	gi.positioned_sound(start,self,CHAN_WEAPON,gi.soundindex(va("weapons/machgf%db.wav",self->actor_gunframe % 5 + 1)),1,ATTN_NORM,0);
-
+#endif
 	if(self->flash)
 	{
 		VectorCopy(start,self->flash->s.origin);
@@ -416,10 +421,12 @@ void actorChaingun (edict_t *self)
 		VectorNormalize (forward);
 		for(i=0; i<shots; i++)
 			fire_bullet (self, start, forward, damage, 2, DEFAULT_BULLET_HSPREAD, DEFAULT_BULLET_VSPREAD, MOD_CHAINGUN);
+#if !KINGPIN //hypov8 todo: dll
 		gi.WriteByte(svc_temp_entity);
 		gi.WriteByte(TE_CHAINFIST_SMOKE);
 		gi.WritePosition(start);
 		gi.multicast(start, MULTICAST_PVS);
+#endif
 	}
 }
 

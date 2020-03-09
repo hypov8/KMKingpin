@@ -478,9 +478,9 @@ void CL_PredictMovement (void)
 	memset (&pm, 0, sizeof(pm));
 	pm.trace = CL_PMTrace;
 	pm.pointcontents = CL_PMpointcontents;
-
+#if !KINGPIN //hypov8 pm_airaccelerate forced 1
 	pm_airaccelerate = atof(cl.configstrings[CS_AIRACCEL]);
-
+#endif
 	pm.s = cl.frame.playerstate.pmove;
 
 //	SCR_DebugGraph (current - ack - 1, 0);

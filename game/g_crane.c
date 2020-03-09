@@ -21,7 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "g_local.h"
 
-void box_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf);
+void box_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf);
 
 // g_crane.c
 //

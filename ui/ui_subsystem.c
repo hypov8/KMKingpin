@@ -428,11 +428,11 @@ void UI_Precache (void)
 	R_DrawFindPic (UI_NOSCREEN_NAME); 
 
 	// loadscreen images
-	R_DrawFindPic ("/pics/loading.pcx");
-	R_DrawFindPic ("/pics/loading_bar.pcx");
-	R_DrawFindPic ("/pics/downloading.pcx");
-	R_DrawFindPic ("/pics/downloading_bar.pcx");
-	R_DrawFindPic ("/pics/loading_led1.pcx");
+	R_DrawFindPic ("/pics/loading.tga");
+	R_DrawFindPic ("/pics/loading_bar.tga");
+	R_DrawFindPic ("/pics/downloading.tga");
+	R_DrawFindPic ("/pics/downloading_bar.tga");
+	R_DrawFindPic ("/pics/loading_led1.tga");
 
 	// cursors
 //	R_DrawFindPic (UI_MOUSECURSOR_MAIN_PIC);
@@ -442,11 +442,14 @@ void UI_Precache (void)
 //	R_DrawFindPic (UI_MOUSECURSOR_TEXT_PIC);
 	R_DrawFindPic (UI_MOUSECURSOR_PIC);
 
+#if !KINGPIN
 	for (i = 0; i < NUM_MAINMENU_CURSOR_FRAMES; i++) {
 		Com_sprintf (scratch, sizeof(scratch), "/pics/m_cursor%d.pcx", i);
 		R_DrawFindPic (scratch);
 	}
+#endif
 
+#if !KINGPIN
 	// main menu items
 	R_DrawFindPic ("/pics/m_main_game.pcx");
 	R_DrawFindPic ("/pics/m_main_game_sel.pcx");
@@ -463,6 +466,7 @@ void UI_Precache (void)
 	R_DrawFindPic ("/pics/m_main_plaque.pcx");
 	R_DrawFindPic ("/pics/m_main_logo.pcx");
 	R_RegisterModel ("models/ui/quad_cursor.md2");
+
 
 	// menu banners
 	R_DrawFindPic ("/pics/m_banner_game.pcx");
@@ -487,6 +491,7 @@ void UI_Precache (void)
 	R_DrawFindPic ("/gfx/ui/arrows/arrow_left_d.pcx");
 	R_DrawFindPic ("/gfx/ui/arrows/arrow_right.pcx");
 	R_DrawFindPic ("/gfx/ui/arrows/arrow_right_d.pcx"); 
+#endif
 }
 
 
@@ -543,20 +548,39 @@ void UI_Draw (void)
 	if (cls.key_dest != key_menu)
 		return;
 
+#if KINGPIN
+	//hypov8 add: close console, it allows player to shoot
+	if (cls.consoleActive && cls.state == ca_active)
+		Con_ToggleConsole_f();
+
+
 	// dim everything behind it down
 	if (cl.cinematictime > 0 || cls.state == ca_disconnected)
 	{
-		if (R_DrawFindPic("/gfx/ui/menu_background.pcx"))
-			R_DrawStretchPic (0, 0, viddef.width, viddef.height, "/gfx/ui/menu_background.pcx", 1.0);
+		if (R_DrawFindPic("backround"))
+			R_DrawStretchPic (0, 0, viddef.width, viddef.height, "backround", 1.0);
 		else
 			R_DrawFill (0,0,viddef.width, viddef.height, 0,0,0,255);
 	}
 	// ingame menu uses alpha
-	else if (R_DrawFindPic("/gfx/ui/menu_background.pcx"))
-		R_DrawStretchPic (0, 0, viddef.width, viddef.height, "/gfx/ui/menu_background.pcx", menu_alpha->value);
+	else if (R_DrawFindPic("backround"))
+		R_DrawStretchPic (0, 0, viddef.width, viddef.height, "backround", 1.0f);//menu_alpha->value
+	else
+		R_DrawFill (0,0,viddef.width, viddef.height, 0,0,0,(int)(1*255));//menu_alpha->value
+#else
+	if (cl.cinematictime > 0 || cls.state == ca_disconnected)
+	{
+		if (R_DrawFindPic(UI_BACKGROUND_NAME))
+			R_DrawStretchPic (0, 0, viddef.width, viddef.height, UI_BACKGROUND_NAME, 1.0);
+		else
+			R_DrawFill (0,0,viddef.width, viddef.height, 0,0,0,255);
+	}
+	// ingame menu uses alpha
+	else if (R_DrawFindPic(UI_BACKGROUND_NAME))
+		R_DrawStretchPic (0, 0, viddef.width, viddef.height, UI_BACKGROUND_NAME, menu_alpha->value);
 	else
 		R_DrawFill (0,0,viddef.width, viddef.height, 0,0,0,(int)(menu_alpha->value*255));
-
+#endif
 	// Knigthmare- added Psychospaz's mouse support
 	UI_RefreshCursorMenu();
 

@@ -68,6 +68,15 @@ trace_t SV_Trace (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, edict_t *p
 #define random()	((rand () & 0x7fff) / ((float)0x7fff))
 #define crandom()	(2.0 * (random() - 0.5))
 
+#if KINGPIN // hypov8 add: 
+#define UI_MAP_SCRN_DIR "hdmap" // specific folder for map loading images
+#define LOADSCREEN_NAME "/pics/conback.tga"
+#else
+#define UI_MAP_SCRN_DIR "levelshots" //specific folder for map loading images
+#define LOADSCREEN_NAME	"/gfx/ui/unknownmap.pcx"
+#endif
+
+
 
 //=============================================================================
 
@@ -108,10 +117,16 @@ typedef struct
 {
 	char	name[MAX_QPATH];
 	char	cinfo[MAX_QPATH];
-	struct image_s	*skin;
+#if KINGPIN
+	struct image_s	*skin[3];
+	struct model_s	*model[3];
+#else
 	struct image_s	*icon;
-	char	iconname[MAX_QPATH];
+	struct image_s	*skin;
 	struct model_s	*model;
+	char	iconname[MAX_QPATH];
+#endif
+
 	struct model_s	*weaponmodel[MAX_CLIENTWEAPONMODELS];
 } clientinfo_t;
 
@@ -285,6 +300,14 @@ typedef enum {
 
 typedef enum {key_game, key_console, key_message, key_menu} keydest_t;
 
+#if 0//KINGPIN
+#ifdef _WIN32
+typedef unsigned __int32 uint32;
+#else /* NON-WIN32 */
+typedef int32_t int32;
+#endif
+#endif
+
 typedef struct
 {
 	connstate_t	state;
@@ -325,6 +348,18 @@ typedef struct
 	size_t		downloadposition;	// added for HTTP downloads
 	int			downloadpercent;
 	float		downloadrate;		// Knightmare- to display KB/s
+#if KINGPIN
+	int downloadsize; //add hypov8
+
+	uint32			downloadid;			// MH: download request ID
+	int		 		downloadoffset;		// MH: download request offset
+	int				downloadpos;		// MH: download position
+	//int				downloadrate;		// MH: download rate (KB/s)
+	float			downloadtokens;		// MH: download tokens (to enforce rate)
+	//download_t		*downloadcache;		// MH: compressed/cached file
+	qboolean		downloadpak;		// MH: download is a pak
+#endif
+
 
 // demo recording info must be here, so it isn't cleared on level change
 	qboolean	demorecording;
@@ -429,7 +464,9 @@ extern	cvar_t	*cl_xatrix_music; // whether to play Xatrix tracks
 // end Knightmare
 
 extern	cvar_t	*cl_servertrick;
-
+#if KINGPIN
+extern	cvar_t	*cl_servertype;
+#endif
 extern	cvar_t	*cl_upspeed;
 extern	cvar_t	*cl_forwardspeed;
 extern	cvar_t	*cl_sidespeed;
@@ -504,6 +541,10 @@ extern	cvar_t	*cl_http_proxy;
 extern	cvar_t	*cl_http_max_connections;
 #endif	// USE_CURL
 
+#if KINGPIN
+extern	cvar_t	*extras;
+#endif
+
 typedef struct
 {
 	int		key;				// so entities can reuse same entry
@@ -537,7 +578,7 @@ float ClampCvar( float min, float max, float value );
 void TextColor (int colornum, int *red, int *green, int *blue);
 qboolean StringSetParams (char modifier, int *red, int *green, int *blue, int *bold, int *shadow, int *italic, int *reset);
 void Con_DrawString (int x, int y, char *s, int alpha);
-void DrawStringGeneric (int x, int y, const char *string, int alpha, textscaletype_t scaleType, qboolean altBit);
+void DrawStringGeneric (int x, int y, const char *string, int alpha, textscaletype_t scaleType, qboolean altBit, int R, int G, int B);
 
 //cl_scrn.c
 typedef struct
@@ -675,6 +716,9 @@ void CL_ParseConfigString (void);
 void CL_PlayBackgroundTrack (void); // Knightmare added
 void CL_ParseMuzzleFlash (void);
 void CL_ParseMuzzleFlash2 (void);
+#if KINGPIN
+void CL_ParseMuzzleFlash3 (void);
+#endif
 void SmokeAndFlash(vec3_t origin);
 
 void CL_SetLightstyle (int i);
@@ -795,6 +839,10 @@ void CL_GetChallengePacket (void);
 void CL_PingServers_f (void);
 void CL_Snd_Restart_f (void);
 void CL_WriteConfig_f (void);
+#if KINGPIN
+void CL_GetServersFromMaster_f (void); //hypov8
+#endif
+
 
 void vectoangles2 (vec3_t value1, vec3_t angles);
 
@@ -853,7 +901,9 @@ void CL_ParseServerMessage (void);
 void CL_LoadClientinfo (clientinfo_t *ci, char *s);
 void SHOWNET(char *s);
 void CL_ParseClientinfo (int player);
-
+#if KINGPIN
+qboolean CL_ParseSkinFfolderTxt(char *skinFolder, char *outHead, char *outBody, char *outLegs);
+#endif
 //
 // cl_download.c
 //
@@ -861,6 +911,9 @@ void CL_RequestNextDownload (void);
 qboolean CL_CheckOrDownloadFile (char *filename);
 void CL_Download_f (void);
 void CL_ParseDownload (void);
+#if KINGPIN
+void CL_ParsePushDownload(void);
+#endif
 void CL_Download_Reset_KBps_counter (void);
 void CL_Download_Calculate_KBps (int byteDistance, int totalSize);
 

@@ -1381,7 +1381,7 @@ gitem_t *CTFWhat_Flag (edict_t *ent)
 	return NULL;
 }
 
-/*static*/ void CTFDropFlagTouch (edict_t *ent, edict_t *other, cplane_t *plane, csurface_t *surf)
+/*static*/ void CTFDropFlagTouch (edict_t *ent, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	//owner (who dropped us) can't touch for two secs
 	if ( (other == ent->owner) && 
@@ -2058,7 +2058,7 @@ void CTFResetGrapple (edict_t *self)
 	}
 }
 
-void CTFGrappleTouch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void CTFGrappleTouch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	float volume = 1.0;
 
@@ -2892,7 +2892,7 @@ qboolean CTFPickup_Tech (edict_t *ent, edict_t *other)
 
 /*static*/ void SpawnTech (gitem_t *item, edict_t *spot);
 
-void CTFTechTouch (edict_t *ent, edict_t *other, cplane_t *plane, csurface_t *surf)
+void CTFTechTouch (edict_t *ent, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	//owner (who dropped us) can't touch for two secs
 	if ((other == ent->owner) && (level.time < ent->touch_debounce_time))
@@ -5199,7 +5199,7 @@ qboolean CTFCheckRules (void)
  * just here to help old map conversions
  *--------------------------------------------------------------------------*/
 
-/*static*/ void old_teleporter_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+/*static*/ void old_teleporter_touch (edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	edict_t		*dest;
 	int			i;

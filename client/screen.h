@@ -48,7 +48,11 @@ typedef enum
 {
 SCALETYPE_CONSOLE,
 SCALETYPE_HUD,
+#if KINGPIN
+SCALETYPE_SCORE,
+#endif
 SCALETYPE_MENU
+
 } textscaletype_t;
 
 
@@ -59,6 +63,9 @@ void	SCR_UpdateScreen (void);
 void	SCR_SizeUp (void);
 void	SCR_SizeDown (void);
 void	SCR_CenterPrint (char *str);
+#if KINGPIN
+void	SCR_ChatPrint (char *str);
+#endif
 void	SCR_BeginLoadingPlaque (void);
 void	SCR_EndLoadingPlaque (void);
 
@@ -115,8 +122,14 @@ extern	int			crosshair_width, crosshair_height;
 #define MENU_FONT_SIZE	8
 #define MENU_LINE_SIZE	10
 
+#if KINGPIN
 #define HUD_FONT_SIZE	8.0
 
+#define FONT_SIZE_SCORE	10
+#define FONT_SCALE_SCORE	1.4
+#else
+#define HUD_FONT_SIZE	8.0
+#endif
 
 //
 // scr_cin.c

@@ -24,6 +24,118 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 game_export_t	*ge;
 
 
+#if KINGPIN
+#define	TAG_LEVEL	766		// clear when loading a new level
+#define	MAX_OBJECT_BOUNDS	2048
+
+typedef struct
+{
+	int magic;
+	int version;
+	int skinWidth;
+	int skinHeight;
+	int frameSize;
+	int numSkins;
+	int numVertices;
+	int numTriangles;
+	int numGlCommands;
+	int numFrames;
+	int numSfxDefines;
+	int numSfxEntries;
+	int numSubObjects;
+	int offsetSkins;
+	int offsetTriangles;
+	int offsetFrames;
+	int offsetGlCommands;
+	int offsetVertexInfo;
+	int offsetSfxDefines;
+	int offsetSfxEntries;
+	int offsetBBoxFrames;
+	int offsetDummyEnd;
+	int offsetEnd;
+} mdx_head_t;
+
+static int objectc = 0;
+static char *objectbounds_filename[MAX_MODELS];
+static int object_bounds[MAX_MODELS][MAX_MODELPART_OBJECTS];
+
+void EXPORT MDX_ClearObjectBoundsCached(void)
+{
+	objectc = 0;
+}
+
+void EXPORT MDX_GetObjectBounds(const char *mdx_filename, model_part_t *model_part)
+{
+	int i, j;
+	for (i=0; i<objectc; i++)
+	{
+		if (!Q_stricmp(objectbounds_filename[i], mdx_filename))
+			goto ok;
+	}
+	memset(model_part->object_bounds, 0, sizeof(model_part->object_bounds));
+	if (objectc == MAX_MODELS)
+	{
+		Com_Printf (S_COLOR_RED"ERROR: MDX_GetObjectBounds: Reached MAX_MODELS limit, unable to load object-bounds\n");
+		return;
+	}
+	else
+	{
+		void *data;
+		int size = FS_LoadFile(mdx_filename, &data);
+		if (!data)
+		{
+			Com_Printf (S_COLOR_YELLOW"WARNING: MDX_GetObjectBounds: Unable to find MDX file \"%s\", using simple collision detection\n", mdx_filename);
+			return;
+		}
+		else
+		{
+			int *NumObjectBounds = ge->GetNumObjectBounds();
+			void **ObjectBoundsPointer = ge->GetObjectBoundsPointer();
+			mdx_head_t head;
+			for (j=0; j<sizeof(head)/4; j++)
+				((uint32*)&head)[j] = LittleLong(((int32*)data)[j]);
+			if (head.magic != 0x58504449 || head.numSubObjects > MAX_MODELPART_OBJECTS || head.offsetBBoxFrames + head.numSubObjects * head.numFrames * 24 > size)
+			{
+				FS_FreeFile(data);
+				Com_Printf (S_COLOR_RED"ERROR: MDX_GetObjectBounds: Invalid MDX file \"%s\"\n", mdx_filename);
+				return;
+			}
+			if (*NumObjectBounds + head.numSubObjects >= MAX_OBJECT_BOUNDS)
+			{
+				FS_FreeFile(data);
+				Com_Printf (S_COLOR_RED"ERROR: MDX_GetObjectBounds: Out of ObjectBounds items\n");
+				return;
+			}
+			objectbounds_filename[i] = strcpy(Z_TagMalloc(strlen(mdx_filename)+1, TAG_LEVEL), mdx_filename);
+			memset(object_bounds[i], 0, sizeof(object_bounds[i]));
+			{
+				void *d = Z_TagMalloc(head.numSubObjects*head.numFrames*24, TAG_LEVEL);
+				memcpy(d, ((char*)data)+head.offsetBBoxFrames, head.numSubObjects*head.numFrames*24);
+				for (j=0; j<head.numSubObjects; j++)
+				{
+					ObjectBoundsPointer[*NumObjectBounds] = ((char*)d)+j*head.numFrames*24;
+					object_bounds[i][j] = ++(*NumObjectBounds);
+				}
+			}
+			FS_FreeFile(data);
+		}
+	}
+	objectc++;
+
+ok:
+	memcpy(model_part->object_bounds, object_bounds[i], sizeof(model_part->object_bounds));
+	model_part->objectbounds_filename = objectbounds_filename[i];
+}
+
+void EXPORT VID_StopRender(void)
+{
+}
+
+void EXPORT SV_SaveNewLevel(void);
+#endif
+
+
+
 /*
 ===============
 PF_Unicast
@@ -40,7 +152,7 @@ void PF_Unicast (edict_t *ent, qboolean reliable)
 		return;
 
 	p = NUM_FOR_EDICT(ent);
-	if (p < 1 || p > maxclients->value)
+	if (p < 1 || p > (int)maxclients->value)
 		return;
 
 	client = svs.clients + (p-1);
@@ -91,7 +203,7 @@ void PF_cprintf (edict_t *ent, int level, char *fmt, ...)
 	if (ent)
 	{
 		n = NUM_FOR_EDICT(ent);
-		if (n < 1 || n > maxclients->value)
+		if (n < 1 || n > (int)maxclients->value)
 			Com_Error (ERR_DROP, "cprintf to a non-client");
 	}
 
@@ -121,7 +233,7 @@ void PF_centerprintf (edict_t *ent, char *fmt, ...)
 	int			n;
 	
 	n = NUM_FOR_EDICT(ent);
-	if (n < 1 || n > maxclients->value)
+	if (n < 1 || n > (int)maxclients->value)
 		return;	// Com_Error (ERR_DROP, "centerprintf to a non-client");
 
 	va_start (argptr, fmt);
@@ -193,7 +305,7 @@ PF_Configstring
 
 ===============
 */
-void PF_Configstring (int index, char *val)
+void EXPORT PF_Configstring (int index, char *val)
 {
 	size_t	len, maxlen;
 	char	*dest;
@@ -206,11 +318,13 @@ void PF_Configstring (int index, char *val)
 
 	// catch overflow of indvidual configstrings
 	len = strlen(val);
+#if 0// KINGPIN //hypov8 add:
 	maxlen = CS_SIZE(index);
 	if (len >= maxlen) {
 		Com_Printf(S_COLOR_YELLOW"PF_Configstring: index %d overflowed: %d > %d\n", index, len, maxlen);
 		len = maxlen - 1;
 	}
+#endif
 
 	// change the string in sv
 	// Don't use a null-terminated strncpy here!!
@@ -409,6 +523,14 @@ void SV_InitGameProgs (void)
 	import.SetAreaPortalState = CM_SetAreaPortalState;
 	import.AreasConnected = CM_AreasConnected;
 
+#if KINGPIN
+	import.skinindex = SV_SkinIndex;
+	import.ClearObjectBoundsCached = MDX_ClearObjectBoundsCached;
+	//import.StopRender = VID_StopRender;
+	import.GetObjectBounds = MDX_GetObjectBounds;
+	//import.SaveCurrentGame = SV_SaveNewLevel;
+#endif
+
 	ge = (game_export_t *)Sys_GetGameAPI (&import);
 
 	if (!ge)
@@ -416,7 +538,28 @@ void SV_InitGameProgs (void)
 	if (ge->apiversion != GAME_API_VERSION)
 		Com_Error (ERR_DROP, "game is version %i, not %i", ge->apiversion,
 		GAME_API_VERSION);
-
+#if KINGPIN
+		//r1: verify we got essential exports
+	if (!ge->ClientCommand || !ge->ClientBegin || !ge->ClientConnect || !ge->ClientDisconnect || !ge->ClientUserinfoChanged ||
+		!ge->ReadGame || !ge->ReadLevel || !ge->RunFrame || !ge->ServerCommand || !ge->Shutdown || !ge->SpawnEntities ||
+		!ge->WriteGame || !ge->WriteLevel || !ge->Init)
+		Com_Error (ERR_DROP, "Game is missing required exports");
+#endif
 	ge->Init ();
+
+#if !KINGPIN
+		if (!ge->edicts)
+		Com_Error (ERR_DROP, "Game failed to initialize globals.edicts");
+
+
+	//r1: moved from SV_InitGame to here.
+	for (i=0 ; i<maxclients->intvalue ; i++)
+	{
+		ent = EDICT_NUM(i+1);
+		ent->s.number = i+1;
+		svs.clients[i].edict = ent;
+		memset (&svs.clients[i].lastcmd, 0, sizeof(svs.clients[i].lastcmd));
+	}
+#endif
 }
 

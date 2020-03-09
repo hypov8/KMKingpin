@@ -54,6 +54,10 @@ you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, R
 #include "l_precomp.h"
 #include "l_log.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 typedef enum {qfalse, qtrue}    qboolean;
 
 extern void Error( char *error, ... );

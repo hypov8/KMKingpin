@@ -55,7 +55,12 @@ executing.  This is a precacution against having a malicious server
 instruct clients to write files over areas they shouldn't.
 */
 
-#define BASEDIRNAME				"baseq2"
+#if KINGPIN //hypov8
+#define	BASEDIRNAME	"main"
+#else
+#define	BASEDIRNAME	"baseq2"
+#endif
+
 
 #define MAX_HANDLES				32
 #define MAX_READ				0x10000
@@ -136,6 +141,9 @@ cvar_t	*fs_roguegame;
 void CDAudio_Stop (void);
 void Com_FileExtension (const char *path, char *dst, int dstSize);
 
+#if KINGPIN
+const char *lastpakfile;	// MH: PAK that last opened file is from (if any)
+#endif
 
 /*
 =================

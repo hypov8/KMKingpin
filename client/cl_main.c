@@ -67,7 +67,9 @@ cvar_t	*r_maxfps;
 cvar_t	*cl_sleep; 
 // whether to trick version 34 servers that this is a version 34 client
 cvar_t	*cl_servertrick;
-
+#if KINGPIN
+cvar_t	*cl_servertype;
+#endif
 cvar_t	*cl_gun;
 cvar_t	*cl_weapon_shells;
 
@@ -169,6 +171,13 @@ cvar_t	*cl_drawlocs;
 cvar_t	*loc_here;
 cvar_t	*loc_there;
 #endif	// LOC_SUPPORT
+
+#if KINGPIN
+cvar_t	*extras;
+
+cvar_t	*cl_parental_lock;
+cvar_t	*cl_parental_override;
+#endif
 
 client_static_t	cls;
 client_state_t	cl;
@@ -530,7 +539,11 @@ void CL_SendConnectPacket (void)
 
 	// if in compatibility mode, lie to server about this
 	// client's protocol, but exclude localhost for this.
-	if (cl_servertrick->value && strcmp(cls.servername, "localhost"))
+	if (cl_servertrick->value 
+#if !KINGPIN //hypov8
+		&& strcmp(cls.servername, "localhost")
+#endif
+		) 
 		Netchan_OutOfBandPrint (NS_CLIENT, adr, "connect %i %i %i \"%s\"\n",
 			OLD_PROTOCOL_VERSION, port, cls.challenge, Cvar_Userinfo() );
 	else
@@ -934,7 +947,80 @@ void CL_ParseStatusMessage (void)
 	UI_AddToServerList (net_from, s);
 }
 
+#if KINGPIN
+#define MAX_INET_SERVERS 32 //hypov8 move to h..
+extern int      global_adr_iServer_time[MAX_INET_SERVERS];
+extern netadr_t global_adr_iServer_netadr[MAX_INET_SERVERS];
 
+void CL_ParseServerListMessage (void) //hypov8
+{
+	char	*s, *ip;
+	int i, j, count=0, len;
+	netadr_t	adr;
+
+	s = MSG_ReadString(&net_message);
+
+	len = strlen(s);
+
+	if (len >= 6)
+	{
+		for (i = 0; i < MAX_INET_SERVERS; i++)
+			memset(&global_adr_iServer_netadr[i], 0, sizeof(netadr_t));
+		//refresh ui?
+	}
+
+	Com_Printf ("%s\n", s);
+
+	for (i = 0; i < len; i+=6)
+	{
+		if (i + 6 <= len)
+		{
+			char strIP[32];
+			unsigned short  sv_port;
+			sv_port = s[i + 4] << 8;
+			sv_port += s[i + 5];
+
+			//build ip string
+			Com_sprintf (strIP, sizeof(strIP), "%u.%u.%u.%u:%u", 
+				(byte) s[i], (byte) s[i + 1], (byte) s[i + 2], (byte)s[i + 3], sv_port);
+
+
+			Com_Printf ("pinging %s...\n", strIP);
+			if (!NET_StringToAdr (strIP, &adr))
+			{
+				Com_Printf ("Bad address: %s\n", strIP);
+				continue;
+			}    
+
+			memcpy(&global_adr_iServer_netadr[count], &adr, sizeof(netadr_t));
+			global_adr_iServer_time[count] = Sys_Milliseconds() ;
+
+			if (cl_servertrick->value)
+				Netchan_OutOfBandPrint (NS_CLIENT, adr, va("info %i", OLD_PROTOCOL_VERSION));
+			else
+				Netchan_OutOfBandPrint (NS_CLIENT, adr, va("info %i", PROTOCOL_VERSION));
+
+			count++;
+		}
+	}
+	//CL_PingServers_f();
+}
+
+void CL_GetServersFromMaster_f(void) //hypov8
+{
+	netadr_t	adr;
+	char * ip = "192.168.2.123:27900";
+
+	NET_Config (true);		// allow remote
+
+
+	// send a broadcast packet
+	Com_Printf ("query master...\n");
+
+	NET_StringToAdr(ip, &adr);
+	Netchan_OutOfBandPrint (NS_CLIENT, adr, "query \n");
+}
+#endif
 /*
 =================
 CL_PingServers_f
@@ -964,7 +1050,7 @@ void CL_PingServers_f (void)
 	// send a packet to each address book entry
 	for (i=0 ; i<16 ; i++)
 	{
-        memset(&global_adr_server_netadr[i], 0, sizeof(global_adr_server_netadr[0]));
+        memset(&global_adr_server_netadr[i], 0, sizeof(adr));
         global_adr_server_time[i] = Sys_Milliseconds() ;
 
         Com_sprintf (name, sizeof(name), "adr%i", i);
@@ -981,7 +1067,7 @@ void CL_PingServers_f (void)
 		if (!adr.port)
 			adr.port = BigShort(PORT_SERVER);
         
-        memcpy(&global_adr_server_netadr[i], &adr, sizeof(global_adr_server_netadr));
+        memcpy(&global_adr_server_netadr[i], &adr, sizeof(adr));
 
 		// if the server is using the old protocol,
 		// lie to it about this client's protocol
@@ -1246,7 +1332,13 @@ void CL_ConnectionlessPacket (void)
 		Netchan_OutOfBandPrint (NS_CLIENT, net_from, "%s", Cmd_Argv(1) );
 		return;
 	}
-
+#if KINGPIN
+	if (!strcmp(c, "servers")) //hypov8
+	{
+		CL_ParseServerListMessage ();
+		return;
+	}
+#endif
 	Com_Printf ("Unknown command.\n");
 }
 
@@ -1351,10 +1443,17 @@ void CL_FixUpGender(void)
 		strncpy(sk, skin->string, sizeof(sk) - 1);
 		if ((p = strchr(sk, '/')) != NULL)
 			*p = 0;
+#if KINGPIN //hypov8 todo: "gender" "male" default?
+		if (Q_strncasecmp(sk, "male_", 5) ==0)
+			Cvar_Set ("gender", "male");
+else if (Q_strncasecmp(sk, "female_", 7) ==0)
+			Cvar_Set ("gender", "female");
+#else
 		if (Q_stricmp(sk, "male") == 0 || Q_stricmp(sk, "cyborg") == 0)
 			Cvar_Set ("gender", "male");
 		else if (Q_stricmp(sk, "female") == 0 || Q_stricmp(sk, "crackhor") == 0)
 			Cvar_Set ("gender", "female");
+#endif
 		else
 			Cvar_Set ("gender", "none");
 		gender->modified = false;
@@ -1544,14 +1643,18 @@ void CL_InitLocal (void)
 #ifdef CLIENT_SPLIT_NETFRAME
 	cl_async = Cvar_Get ("cl_async", "1", 0);
 	net_maxfps = Cvar_Get ("net_maxfps", "60", 0);
-	r_maxfps = Cvar_Get ("r_maxfps", "125", 0);
+	r_maxfps = Cvar_Get ("r_maxfps", "125", 0); //hypov8 should this be cl_maxfps?
 #endif
 
 	cl_sleep = Cvar_Get ("cl_sleep", "1", 0); 
 
 	// whether to trick version 34 servers that this is a version 34 client
+#if !KINGPIN
 	cl_servertrick = Cvar_Get ("cl_servertrick", "0", CVAR_ARCHIVE);
-
+#else
+	cl_servertrick = Cvar_Get ("cl_servertrick", "1", CVAR_ARCHIVE);
+	cl_servertype = Cvar_Get ("cl_servertype", "1", CVAR_ARCHIVE);
+#endif
 	// Psychospaz's chasecam
 	cg_thirdperson = Cvar_Get ("cg_thirdperson", "0", CVAR_ARCHIVE);
 	cg_thirdperson_angle = Cvar_Get ("cg_thirdperson_angle", "10", CVAR_ARCHIVE);
@@ -1632,6 +1735,8 @@ void CL_InitLocal (void)
 	// userinfo
 	//
 	info_password = Cvar_Get ("password", "", CVAR_USERINFO);
+	name = Cvar_Get ("name", "unnamed", CVAR_USERINFO | CVAR_ARCHIVE);
+#if !KINGPIN
 	info_spectator = Cvar_Get ("spectator", "0", CVAR_USERINFO);
 	name = Cvar_Get ("name", "unnamed", CVAR_USERINFO | CVAR_ARCHIVE);
 	skin = Cvar_Get ("skin", "male/grunt", CVAR_USERINFO | CVAR_ARCHIVE);
@@ -1639,6 +1744,7 @@ void CL_InitLocal (void)
 	msg = Cvar_Get ("msg", "1", CVAR_USERINFO | CVAR_ARCHIVE);
 	hand = Cvar_Get ("hand", "0", CVAR_USERINFO | CVAR_ARCHIVE);
 	fov = Cvar_Get ("fov", "90", CVAR_USERINFO | CVAR_ARCHIVE);
+
 	gender = Cvar_Get ("gender", "male", CVAR_USERINFO | CVAR_ARCHIVE);
 	gender_auto = Cvar_Get ("gender_auto", "1", CVAR_ARCHIVE);
 	gender->modified = false; // clear this so we know when user sets it manually
@@ -1648,6 +1754,25 @@ void CL_InitLocal (void)
 	// for the server to tell which version the client is
 	cl_engine = Cvar_Get ("cl_engine", "KMQuake2", CVAR_USERINFO | CVAR_NOSET | CVAR_LATCH);
 	cl_engine_version = Cvar_Get ("cl_engine_version", va("%4.2f",VERSION), CVAR_USERINFO | CVAR_NOSET | CVAR_LATCH);
+#else
+	skin = Cvar_Get ("skin", "male_thug/001 001 001", CVAR_USERINFO | CVAR_ARCHIVE);
+	extras = Cvar_Get ("extras", "0000", CVAR_USERINFO | CVAR_ARCHIVE);
+	gender = Cvar_Get ("gender", "male",  CVAR_ARCHIVE); //hypov8 edit: dont send to server
+	rate = Cvar_Get ("rate", "25000", CVAR_USERINFO | CVAR_ARCHIVE);	// FIXME
+	msg = Cvar_Get ("msg", "1", CVAR_USERINFO | CVAR_ARCHIVE);
+	hand = Cvar_Get ("hand", "0", CVAR_USERINFO | CVAR_ARCHIVE);
+	fov = Cvar_Get ("fov", "90", CVAR_USERINFO | CVAR_ARCHIVE);
+
+	gender_auto = Cvar_Get ("gender_auto", "1", CVAR_ARCHIVE);
+	gender->modified = false; // clear this so we know when user sets it manually
+
+	cl_vwep = Cvar_Get ("cl_vwep", "1", CVAR_ARCHIVE);
+	//name ??
+	cl_parental_lock = Cvar_Get ("cl_parental_lock ", "0",  0); 
+	cl_parental_override  = Cvar_Get ("cl_parental_override ", "0",  0);
+	cl_engine_version = Cvar_Get ("ver", va("%i",VERSION_INT), CVAR_USERINFO | CVAR_NOSET | CVAR_LATCH);
+	//gl_mode ??
+#endif
 
 #ifdef LOC_SUPPORT	// Xile/NiceAss LOC
 	cl_drawlocs =		Cvar_Get("cl_drawlocs", "0", 0);
@@ -1721,7 +1846,11 @@ void CL_InitLocal (void)
 	Cmd_AddCommand ("info", NULL);
 	Cmd_AddCommand ("prog", NULL);
 	Cmd_AddCommand ("give", NULL);
+#if KINGPIN
+	Cmd_AddCommand ("immortal", NULL);
+#else
 	Cmd_AddCommand ("god", NULL);
+#endif
 	Cmd_AddCommand ("notarget", NULL);
 	Cmd_AddCommand ("noclip", NULL);
 	Cmd_AddCommand ("invuse", NULL);
@@ -1762,7 +1891,7 @@ void CL_WriteConfiguration (char *cfgName)
 		return;
 	}
 
-	fprintf (f, "// This file is generated by KMQuake2, do not modify.\n");
+	fprintf (f, "// This file is generated by "KM_GAME_NAME", do not modify.\n");
 	fprintf (f, "// Use autoexec.cfg for adding custom settings.\n");
 	Key_WriteBindings (f);
 	fclose (f);

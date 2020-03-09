@@ -49,6 +49,9 @@ typedef struct areanode_s
 #define	AREA_DEPTH	4
 #define	AREA_NODES	32
 
+#if !KINGPIN
+unsigned int		sv_tracecount;
+#endif
 areanode_t	sv_areanodes[AREA_NODES];
 int			sv_numareanodes;
 

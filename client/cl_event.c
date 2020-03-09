@@ -130,6 +130,7 @@ void CL_FootSteps (entity_state_t *ent, qboolean loud)
 	surface = tr.surface->flags & SURF_STEPMASK;
 	switch (surface)
 	{
+#ifndef KINGPIN
 	case SURF_METAL:
 		stepsound = clMedia.sfx_metal_footsteps[r];
 		break;
@@ -173,6 +174,51 @@ void CL_FootSteps (entity_state_t *ent, qboolean loud)
 		stepsound = clMedia.sfx_footsteps[r];
 		volume = 1.0;
 		break;
+#else
+	case SURF_METAL:
+		stepsound = clMedia.sfx_metal_footsteps[r];
+		break;
+	//case SURF_GRAVEL: //SURF_DIRT: //hypov8 todo: audio??
+		//stepsound = clMedia.sfx_dirt_footsteps[r];
+		//break;
+	//case SURF_METAL: //SURF_VENT:
+		//stepsound = clMedia.sfx_vent_footsteps[r];
+		break;
+	case SURF_METAL_L: //SURF_GRATE:
+		stepsound = clMedia.sfx_grate_footsteps[r];
+		break;
+	case SURF_TILE:
+		stepsound = clMedia.sfx_tile_footsteps[r];
+		break;
+	//case SURF_GRASS:
+		//stepsound = clMedia.sfx_grass_footsteps[r];
+		//break;
+	case SURF_SNOW:
+		stepsound = clMedia.sfx_snow_footsteps[r];
+		break;
+	case SURF_FABRIC: //SURF_CARPET:
+		stepsound = clMedia.sfx_carpet_footsteps[r];
+		break;
+	//case SURF_FORCE:
+		//stepsound = clMedia.sfx_force_footsteps[r];
+		//break;
+	case SURF_GRAVEL:
+		stepsound = clMedia.sfx_gravel_footsteps[r];
+		break;
+	//case SURF_ICE:
+		//stepsound = clMedia.sfx_ice_footsteps[r];
+		//break;
+	//case SURF_SAND:
+		//stepsound = clMedia.sfx_sand_footsteps[r];
+		//break;
+	case SURF_WOOD:
+		stepsound = clMedia.sfx_wood_footsteps[r];
+		break;
+	case SURF_STANDARD: //hypov8 todo: error?
+		stepsound = clMedia.sfx_footsteps[r];
+		volume = 1.0;
+		break;
+#endif
 	default:
 		if (cl_footstep_override->value && num_texsurfs)
 		{
@@ -213,17 +259,19 @@ the female events are there for backwards compatability
 
 void CL_EntityEvent (entity_state_t *ent)
 {
+	int x;
 	switch (ent->event)
 	{
 	case EV_ITEM_RESPAWN:
-		S_StartSound (NULL, ent->number, CHAN_WEAPON, S_RegisterSound("items/respawn1.wav"), 1, ATTN_IDLE, 0);
-		CL_ItemRespawnParticles (ent->origin);
+		//S_StartSound (NULL, ent->number, CHAN_WEAPON, S_RegisterSound("items/respawn1.wav"), 1, ATTN_IDLE, 0);
+		//CL_ItemRespawnParticles (ent->origin);
 		break;
 	case EV_PLAYER_TELEPORT:
 		S_StartSound (NULL, ent->number, CHAN_WEAPON, S_RegisterSound("misc/tele1.wav"), 1, ATTN_IDLE, 0);
 		CL_TeleportParticles (ent->origin);
 		break;
-	case EV_FOOTSTEP:
+#if !KINGPIN
+			case EV_FOOTSTEP:
 		if (cl_footsteps->value)
 //Knightmare- Lazarus footsteps
 			//S_StartSound (NULL, ent->number, CHAN_BODY, clMedia.sfx_footsteps[rand()&3], 1, ATTN_NORM, 0);
@@ -257,5 +305,70 @@ void CL_EntityEvent (entity_state_t *ent)
 		S_StartSound (NULL, ent->number, CHAN_BODY, clMedia.sfx_ladder[rand()&3], 0.5, ATTN_NORM, 0);
 		break;
 //end Knightmare
+#else
+	case EV_FOOTSTEP0:
+		S_StartSound (NULL, ent->number, CHAN_BODY, clMedia.sfx_footsteps[rand()&3], 0.5, ATTN_NORM, 0);
+		break;
+	case EV_FOOTSTEP1:
+		S_StartSound (NULL, ent->number, CHAN_BODY, clMedia.sfx_carpet_footsteps[rand()&3], 0.5, ATTN_NORM, 0);
+		break;
+	case EV_FOOTSTEP2:
+		S_StartSound (NULL, ent->number, CHAN_BODY, clMedia.sfx_gravel_footsteps[rand()&3], 0.5, ATTN_NORM, 0);
+		break;
+	case EV_FOOTSTEP3:
+		S_StartSound (NULL, ent->number, CHAN_BODY, clMedia.sfx_metal_footsteps[rand()&3], 0.5, ATTN_NORM, 0);
+		break;
+	case EV_FOOTSTEP4:
+		S_StartSound (NULL, ent->number, CHAN_BODY, clMedia.sfx_grate_footsteps[rand()&3], 0.5, ATTN_NORM, 0);
+		break;
+	case EV_FOOTSTEP5:
+		S_StartSound (NULL, ent->number, CHAN_BODY, clMedia.sfx_vent_footsteps[rand()&3], 0.5, ATTN_NORM, 0); //hypov8 todo: ok?
+		break;
+	case EV_FOOTSTEP6:
+		S_StartSound (NULL, ent->number, CHAN_BODY, clMedia.sfx_tile_footsteps[rand()&3], 0.5, ATTN_NORM, 0);
+		break;
+	case EV_FOOTSTEP7:
+		S_StartSound (NULL, ent->number, CHAN_BODY, clMedia.sfx_wood_footsteps[rand()&3], 0.5, ATTN_NORM, 0);
+		break;
+	case EV_FOOTSTEP8:
+		S_StartSound (NULL, ent->number, CHAN_BODY, clMedia.sfx_wade[rand()&3], 0.5, ATTN_NORM, 0);
+		break;
+	case EV_FALLSHORT0:
+		S_StartSound(NULL, ent->number, CHAN_BODY, S_RegisterSound("actors/player/step pavement/land1.wav"), 1, ATTN_IDLE, 0);
+		break;
+	case EV_FALLSHORT1:
+		S_StartSound(NULL, ent->number, CHAN_BODY, S_RegisterSound("actors/player/step rug/land1.wav"), 1, ATTN_IDLE, 0);
+		break;
+	case EV_FALLSHORT2:
+		S_StartSound(NULL, ent->number, CHAN_BODY, S_RegisterSound("actors/player/step gravel/land1.wav"), 1, ATTN_IDLE, 0);		
+		break;
+	case EV_FALLSHORT3:
+		S_StartSound(NULL, ent->number, CHAN_BODY, S_RegisterSound("actors/player/step metal heavy/land1.wav"), 1, ATTN_IDLE, 0);
+		break;
+	case EV_FALLSHORT4:
+		S_StartSound(NULL, ent->number, CHAN_BODY, S_RegisterSound("actors/player/step metal light/land1.wav"), 1, ATTN_IDLE, 0);
+		break;
+	case EV_FALLSHORT5:
+		S_StartSound(NULL, ent->number, CHAN_BODY, S_RegisterSound("actors/player/step tin/land1.wav"), 1, ATTN_IDLE, 0);
+		break;
+	case EV_FALLSHORT6:
+		S_StartSound(NULL, ent->number, CHAN_BODY, S_RegisterSound("actors/player/step marble/land1.wav"), 1, ATTN_IDLE, 0);
+		break;
+	case EV_FALLSHORT7:
+		S_StartSound(NULL, ent->number, CHAN_BODY, S_RegisterSound("actors/player/step wood/land1.wav"), 1, ATTN_IDLE, 0);
+		break;
+	case EV_FALLSHORT8:
+		S_StartSound(NULL, ent->number, CHAN_BODY, S_RegisterSound("actors/player/step water/land1.wav"), 1, ATTN_IDLE, 0);		
+		break;
+	case EV_FALL:										//hypov8 note: * = sexed sounds	
+		S_StartSound(NULL, ent->number, CHAN_AUTO, S_RegisterSound("*fall1.wav"), 1, ATTN_IDLE, 0);
+		break;
+	case EV_FALLFAR:
+		S_StartSound(NULL, ent->number, CHAN_AUTO, S_RegisterSound("*fall2.wav"), 1, ATTN_IDLE, 0);		
+		break;
+	case EV_OTHER_TELEPORT:
+		//S_StartSound (NULL, ent->number, CHAN_WEAPON, S_RegisterSound("misc/tele1.wav"), 1, ATTN_IDLE, 0);
+		break;
+#endif
 	}
 }

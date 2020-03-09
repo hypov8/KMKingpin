@@ -286,12 +286,19 @@ void ParseRenderEntity (entity_t *ent)
 		switch (currentmodel->type)
 		{
 #ifndef MD2_AS_MD3
-		case mod_md2:
+		case mod_alias_md2:
 			R_DrawAliasMD2Model (currententity);
 			break;
 #endif // MD2_AS_MD3
+#if KINGPIN
+#ifndef MDX_AS_MD3
+		case mod_alias_mdx:
+			R_DrawAliasMDXModel (currententity);
+			break;
+#endif // MD2_AS_MD3
+#endif 
 		//Harven MD3 ++
-		case mod_alias:
+		case mod_alias_md3:
 			R_DrawAliasModel (currententity);
 			break;
 		//Harven MD3 --
@@ -354,7 +361,7 @@ void R_DrawAllEntities (qboolean addViewWeaps)
 
 		// check for md3 mesh transparency
 		if (!(currententity->flags & RF_BEAM) && currententity->model) {
-			if ( (currententity->model->type == mod_alias) && currententity->model->hasAlpha)
+			if ( (currententity->model->type == mod_alias_md3) && currententity->model->hasAlpha) //hypov8 todo: mod_alias_mdx
 				alpha = true;
 		}
 
@@ -382,7 +389,7 @@ void R_DrawAllEntities (qboolean addViewWeaps)
 
 		// check for md3 mesh transparency
 		if (!(currententity->flags & RF_BEAM) && currententity->model) {
-			if ( (currententity->model->type == mod_alias) && currententity->model->hasAlpha)
+			if ( (currententity->model->type == mod_alias_md3) && currententity->model->hasAlpha) //hypov8 todo: mod_alias_mdx
 				alpha = true;
 		}
 
@@ -422,8 +429,9 @@ void R_DrawSolidEntities ()
 			alpha = true;
 
 		// check for md3 mesh transparency
-		if (!(currententity->flags & RF_BEAM) && currententity->model) {
-			if ( (currententity->model->type == mod_alias) && currententity->model->hasAlpha)
+		if (!(currententity->flags & RF_BEAM) && currententity->model) 
+		{
+			if ( (currententity->model->type == mod_alias_md3) && currententity->model->hasAlpha) //hypov8 todo: mod_alias_mdx
 				alpha = true;
 		}
 
@@ -473,7 +481,7 @@ void ParseRenderEntityShadow (entity_t *ent)
 	switch (currentmodel->type)
 	{
 #ifndef MD2_AS_MD3
-	case mod_md2:
+	case mod_alias_md2:
 		R_DrawAliasMD2ModelShadow (currententity);
 		break;
 #endif // MD2_AS_MD3

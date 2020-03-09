@@ -99,7 +99,11 @@ static void ResetVideoDefaults ( void *unused )
 	Cvar_SetToDefault ("cl_widescreen_fov");
 
 	Cvar_SetToDefault ("r_modulate");
+#if !KINGPIN
+	Cvar_SetToDefault ("intensity");
+#else
 	Cvar_SetToDefault ("r_intensity");
+#endif
 	Cvar_SetToDefault ("r_rgbscale");
 	Cvar_SetToDefault ("r_trans_lighting");
 	Cvar_SetToDefault ("r_warp_lighting");
@@ -397,9 +401,9 @@ void Menu_Video_Init (void)
 	if ( !con_font_size )
 		con_font_size = Cvar_Get ("con_font_size", "8", CVAR_ARCHIVE);
 
-	s_video_menu.x = SCREEN_WIDTH*0.5;
+	s_video_menu.x = 460;//  SCREEN_WIDTH*0.5; //
 //	s_video_menu.x = viddef.width * 0.50;
-	s_video_menu.y = SCREEN_HEIGHT*0.5 - 80;
+	s_video_menu.y = 100; //SCREEN_HEIGHT*0.5 - 80; //100
 	s_video_menu.nitems = 0;
 
 	s_mode_list.generic.type		= MTYPE_SPINCONTROL;
@@ -593,10 +597,12 @@ Menu_Video_Draw
 void Menu_Video_Draw (void)
 {
 	//int w, h;
-
+#if KINGPIN
+	M_Main_Draw();
+#else
 	// draw the banner
 	Menu_DrawBanner("m_banner_video");
-
+#endif
 	// move cursor to a reasonable starting position
 	Menu_AdjustCursor( &s_video_menu, 1 );
 

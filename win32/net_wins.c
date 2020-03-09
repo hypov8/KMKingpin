@@ -44,7 +44,14 @@ static cvar_t	*noudp;
 static cvar_t	*noipx;
 
 loopback_t	loopbacks[2];
-int			ip_sockets[2];
+
+#if KINGPIN
+static SOCKET		ip_sockets[3] = {0}; // MH: extra socket for Gamespy status requests
+#else
+static SOCKET		ip_sockets[2];
+#endif
+int			server_port; //hypov8 todo: kpded. used???
+
 int			ipx_sockets[2];
 
 char *NET_ErrorString (void);
@@ -516,7 +523,7 @@ int NET_IPSocket (char *net_interface, int port)
 	}
 
 	// make it non-blocking
-	if (ioctlsocket (newsocket, FIONBIO, &_true) == -1)
+	if (ioctlsocket (newsocket, FIONBIO, (u_long *)&_true) == -1)
 	{
 		Com_Printf (S_COLOR_YELLOW"WARNING: UDP_OpenSocket: ioctl FIONBIO: %s\n", NET_ErrorString());
 		return 0;
@@ -528,6 +535,19 @@ int NET_IPSocket (char *net_interface, int port)
 		Com_Printf (S_COLOR_YELLOW"WARNING: UDP_OpenSocket: setsockopt SO_BROADCAST: %s\n", NET_ErrorString());
 		return 0;
 	}
+
+#if KINGPIN
+	// MH: don't bother with TOS on Gamespy status socket
+	if (port != server_port - 10)
+#endif
+	{
+		//r1: set 'interactive' ToS
+		i = 0x10;
+		if (setsockopt(newsocket, IPPROTO_IP, IP_TOS, (char *)&i, sizeof(i)) == -1)
+			Com_Printf ("WARNING: UDP_OpenSocket: setsockopt IP_TOS: %s\n", NET_ErrorString());
+	}
+//hypov8 todo: above used?
+
 
 	if (!net_interface || !net_interface[0] || !stricmp(net_interface, "localhost"))
 		address.sin_addr.s_addr = INADDR_ANY;
@@ -581,6 +601,17 @@ void NET_OpenIP (void)
 		ip_sockets[NS_SERVER] = NET_IPSocket (ip->string, port);
 		if (!ip_sockets[NS_SERVER] && dedicated)
 			Com_Error (ERR_FATAL, "Couldn't allocate dedicated server IP port");
+
+
+#if KINGPIN	 //hypov8
+			// MH: create Gamespy request socket
+			if (dedicated)
+			{
+				ip_sockets[NS_SERVER_GS] = NET_IPSocket (ip->string, port - 10);
+				if (!ip_sockets[NS_SERVER_GS])
+					Com_Error (ERR_FATAL, "Couldn't allocate dedicated server IP port for Gamespy requests on %s:%d. Another application is probably using it.", ip->string, port);
+			}
+#endif
 	}
 
 
@@ -722,7 +753,11 @@ void	NET_Config (qboolean multiplayer)
 
 	if (!multiplayer)
 	{	// shut down any existing sockets
+#if KINGPIN //hypov8 add 3?
+		for (i=0 ; i<3 ; i++)
+#else
 		for (i=0 ; i<2 ; i++)
+#endif
 		{
 			if (ip_sockets[i])
 			{
@@ -767,6 +802,15 @@ void NET_Sleep(int msec)
 		if (ipx_sockets[NS_SERVER] > i)
 			i = ipx_sockets[NS_SERVER];
 	}
+
+#if KINGPIN //hypov8 todo: ok?
+	// MH: include Gamespy request socket
+	if (ip_sockets[NS_SERVER_GS]) {
+		FD_SET(ip_sockets[NS_SERVER_GS], &fdset); // network socket
+		i = ip_sockets[NS_SERVER_GS];
+	}
+#endif
+
 	timeout.tv_sec = msec/1000;
 	timeout.tv_usec = (msec%1000)*1000;
 	select(i+1, &fdset, NULL, NULL, &timeout);

@@ -36,10 +36,11 @@ byte	*membase;
 int		hunkmaxsize;
 int		cursize;
 
-#define	VIRTUAL_ALLOC
+//#define	VIRTUAL_ALLOC
 
 void *Hunk_Begin (int maxsize)
 {
+	void	*buf;
 	// reserve a huge chunk of memory, but don't commit any yet
 	cursize = 0;
 	hunkmaxsize = maxsize;
@@ -50,7 +51,10 @@ void *Hunk_Begin (int maxsize)
 	memset (membase, 0, maxsize);
 #endif
 	if (!membase)
-		Sys_Error ("VirtualAlloc reserve failed");
+	{
+		FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM, NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &buf, 0, NULL);
+		Sys_Error("VirtualAlloc reserve failed\n%s", buf);
+	}
 	return (void *)membase;
 }
 

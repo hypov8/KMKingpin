@@ -55,6 +55,10 @@ typedef struct
 
 	char		configstrings[MAX_CONFIGSTRINGS][MAX_QPATH];
 	entity_state_t	baselines[MAX_EDICTS];
+#if KINGPIN
+	// MH: downloadable files
+	char		dlconfigstrings[MAX_IMAGES][MAX_QPATH];
+#endif
 
 	// the multicast buffer is used to send a message to a set of clients
 	// it is only used to marshall data until SV_Multicast is called
@@ -76,6 +80,7 @@ typedef enum
 	cs_zombie,		// client has been disconnected, but don't reuse
 					// connection for a couple seconds
 	cs_connected,	// has been assigned to a client_t, but not in game yet
+	cs_spawning,	// r1: received new, not begin yet. //hypov8 todo:
 	cs_spawned		// client is fully in game
 } client_state_t;
 
@@ -88,6 +93,24 @@ typedef struct
 	int					first_entity;		// into the circular sv_packet_entities[]
 	int					senttime;			// for ping calculations
 } client_frame_t;
+
+
+#if KINGPIN
+// MH: compressed/cached download
+typedef struct download_t
+{
+	struct download_t *next;
+	char *name;
+	time_t mtime;
+	int size;
+	int offset;
+	int compsize;
+	byte *compbuf;
+	int refc;
+	int fd;
+	intptr_t thread;
+} download_t;
+#endif
 
 #define	LATENCY_COUNTS	16
 #define	RATE_MESSAGES	10
@@ -115,6 +138,11 @@ typedef struct client_s
 	char			name[32];			// extracted from userinfo, high bits masked
 	int				messagelevel;		// for filtering printed messages
 
+#if KINGPIN
+	char			skin[MAX_QPATH];	// MH: current skin
+	char			badmodel[MAX_QPATH];	// MH: bad model name
+#endif
+
 	// The datagram is written to by sound calls, prints, temp ents, etc.
 	// It can be harmlessly overflowed.
 	sizebuf_t		datagram;
@@ -125,6 +153,18 @@ typedef struct client_s
 	byte			*download;			// file being downloaded
 	int				downloadsize;		// total bytes (can't use EOF because of paks)
 	int				downloadcount;		// bytes sent
+#if KINGPIN
+/*r1*/	int				downloadstart;		// MH: file start offset (for paks)
+	uint32			downloadid;			// MH: download request ID
+	int		 		downloadoffset;		// MH: download request offset
+	int				downloadpos;		// MH: download position
+	int				downloadrate;		// MH: download rate (KB/s)
+	float			downloadtokens;		// MH: download tokens (to enforce rate)
+	download_t		*downloadcache;		// MH: compressed/cached file
+	qboolean		downloadpak;		// MH: download is a pak
+#endif
+
+	char			*downloadFileName; //r1:
 
 	int				lastmessage;		// sv.framenum when packet was last received
 	int				lastconnect;
@@ -132,6 +172,20 @@ typedef struct client_s
 	int				challenge;			// challenge of this user, randomly generated
 
 	netchan_t		netchan;
+
+#if !KINGPIN //hypov8 todo: use?
+	// MH: patch version (MH's Kingpin Patch)
+	uint32			patched;
+
+	// MH: compression enabled
+	qboolean		compress;
+
+	// MH: curse sounds disabled
+	uint32			nocurse;
+#endif
+	//r1: client-specific last deltas (kind of like dynamic baselines)
+	entity_state_t	*lastlines; //hypov8 todo: ?
+
 } client_t;
 
 // a client can leave the server in one of four ways:
@@ -224,9 +278,20 @@ client_t *GetClientFromAdr (netadr_t address); //Knightmare added
 void SV_DropClient (client_t *drop);
 void SV_DropClientFromAdr (netadr_t address); // Knightmare added
 
+
+#if KINGPIN
+int EXPORT SV_SkinIndex (int modelindex, const char *name);
+int EXPORT SV_ModelIndex (const char *name);
+int EXPORT SV_SoundIndex (const char *name);
+int EXPORT SV_ImageIndex (const char *name);
+#else
 int SV_ModelIndex (char *name);
 int SV_SoundIndex (char *name);
 int SV_ImageIndex (char *name);
+#endif
+
+
+
 
 void SV_WriteClientdataToMessage (client_t *client, sizebuf_t *msg);
 
@@ -278,7 +343,14 @@ void SV_BroadcastCommand (char *fmt, ...);
 //
 void SV_Nextserver (void);
 void SV_ExecuteClientMessage (client_t *cl);
+#if KINGPIN
+// MH: close a download
+void SV_CloseDownload(client_t *cl);
 
+void ClearCachedDownloads();
+void PushDownload (client_t *cl, qboolean start);
+int GetDownloadRate();
+#endif
 //
 // sv_ccmds.c
 //

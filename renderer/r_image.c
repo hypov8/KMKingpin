@@ -398,7 +398,7 @@ void LoadPCX (char *filename, byte **pic, byte **palette, int *width, int *heigh
     pcx->bytes_per_line = LittleShort(pcx->bytes_per_line);
     pcx->palette_type = LittleShort(pcx->palette_type);
 
-	raw = &pcx->data;
+	raw = pcx->data; //hypov8 remove &.. ok?
 
 	if (pcx->manufacturer != 0x0a
 		|| pcx->version != 5
@@ -457,6 +457,159 @@ void LoadPCX (char *filename, byte **pic, byte **palette, int *width, int *heigh
 
 	FS_FreeFile (pcx);
 }
+
+
+/*
+==============
+LoadPCX2
+hypov8 update to use image internal pallet
+==============
+*/
+void LoadPCX2 (char *filename, byte **pic, byte **palette, int *width, int *height)
+{
+	byte	*raw, *rgbData, *end;
+	pcx_t	*pcx;
+	int		i;
+	int		len;
+	int		dataByte=0, runLength=0;
+	byte	*out, *pix;
+	unsigned short w, h;
+	byte *pixPalID;
+	byte *tmpPal;
+	unsigned size = 0, j;
+	if(width)
+		*width = 0;
+	if(height)
+		*height = 0;
+
+	*pic = NULL;
+	*palette = NULL;
+
+	//
+	// load the file
+	//
+	len = FS_LoadFile (filename, (void **)&raw);
+	if (!raw|| len < 0)
+	{
+		VID_Printf (PRINT_DEVELOPER, "Bad pcx file %s\n", filename);
+		return;
+	}
+
+	if((unsigned)len < sizeof(pcx_t))
+	{
+		VID_Printf (PRINT_DEVELOPER, "PCX truncated %s\n", filename);
+		//FS_FreeFile (pcx); //hypov8 add?
+		return;
+	}
+
+	//
+	// parse the PCX file
+	//
+	pcx = (pcx_t *)raw;
+	end = (byte*)raw + len; //len
+
+	w    = LittleShort(pcx->xmax) + 1;
+	h    = LittleShort(pcx->ymax) + 1;
+	size = w * h;
+
+    pcx->xmin = LittleShort(pcx->xmin);
+    pcx->ymin = LittleShort(pcx->ymin);
+    pcx->xmax = LittleShort(pcx->xmax);
+    pcx->ymax = LittleShort(pcx->ymax);
+    pcx->hres = LittleShort(pcx->hres);
+    pcx->vres = LittleShort(pcx->vres);
+    pcx->bytes_per_line = LittleShort(pcx->bytes_per_line);
+    pcx->palette_type = LittleShort(pcx->palette_type);
+
+
+	if (pcx->manufacturer != 0x0a
+		|| pcx->version != 5
+		|| pcx->encoding != 1
+		|| pcx->bits_per_pixel != 8
+		|| w >= 640
+		|| h >= 480)
+	{
+		VID_Printf (PRINT_ALL, "Bad pcx file %s\n", filename);
+		return;
+	}
+
+	pixPalID = malloc ( size );
+	rgbData = pcx->data;
+
+	j = 0;
+
+	while( j < size)
+	{
+		if(runLength > 0)
+		{
+			pixPalID[j++] = dataByte;
+			--runLength;
+			continue;
+		}
+
+		if(rgbData + 1 > end)
+			break;
+		dataByte = *rgbData++;
+
+		if((dataByte & 0xC0) == 0xC0)
+		{
+			if(rgbData + 1 > end)
+				break;
+			runLength = dataByte & 0x3F;
+			dataByte  = *rgbData++;
+		}
+		else
+			runLength = 1;
+	}
+
+
+	if(j < size )
+	{
+		VID_Printf (PRINT_DEVELOPER, "PCX file truncated: %s\n", filename);
+		//FS_FreeFile (pcx);
+		//pixPalID = NULL;
+		return;
+	}
+
+
+	if( end[-769] != 0x0c)
+	{
+		VID_Printf (PRINT_DEVELOPER, "PCX missing palette: %s\n", filename);
+		//FS_FreeFile (pcx);
+		//free (*pixPalID);
+		//pixPalID = NULL;
+		return;
+	}
+
+	tmpPal = raw + len - 768;
+	
+	pix = out = malloc (size* 4 );//use internal pal
+	for(i = 0; i < (int)size; i++)
+	{
+		unsigned char p = pixPalID[i];
+		pix[i*4] = tmpPal[p * 3];
+		pix[i*4+1] = tmpPal[p * 3 + 1];
+		pix[i*4+2] = tmpPal[p * 3 + 2];
+		if (p == 0x00)
+			pix[i*4+3] = 0x00; //alpha
+		else
+			pix[i*4+3] = 0xff;
+		//pix   += 4;
+	}
+
+
+	if (width)
+		*width = w;
+	if (height)
+		*height = h;
+
+	*pic = out;
+
+	//FS_FreeFile (pcx);
+
+}
+
+
 
 /*
 =========================================================
@@ -1995,6 +2148,8 @@ image_t *R_LoadPic (char *name, byte *pic, int width, int height, imagetype_t ty
 	if (type == it_skin && bits == 8)
 		R_FloodFillSkin(pic, width, height);
 
+#if !KINGPIN //hypov8 disable renaming pcx. used for uppscale
+
 // replacement scaling hack for TGA/JPEG HUD images and skins
 // NOTE: replace this with shaders as soon as they are supported
 	len = strlen(name); 
@@ -2019,7 +2174,7 @@ image_t *R_LoadPic (char *name, byte *pic, int width, int height, imagetype_t ty
 		if (pic) free(pic);
 		if (palette) free(palette);
 	}	
-
+#endif
 	// load little pics into the scrap
 	if (image->type == it_pic && bits == 8
 		&& image->width < 64 && image->height < 64)
@@ -2170,6 +2325,16 @@ image_t *R_LoadWal (char *name, imagetype_t type)
 	return image;
 }
 
+// Ridah, portable strlwr()
+char *kp_strlwr( char *name )
+{
+	int i;
+	for (i=0; name[i]; i++)
+		if (name[i] >= 'A' && name[i] <= 'Z')
+			name[i] -= 'A' - 'a';
+
+	return name;
+}
 
 /*
 ===============
@@ -2199,6 +2364,11 @@ image_t	*R_FindImage (char *name, imagetype_t type)
     {
         if ( *tmp == '\\' )
             *tmp = '/';
+#if KINGPIN
+		//hypov8 lowercase
+		if (*tmp >= 'A' && *tmp <= 'Z')
+			*tmp -= 'A' - 'a';
+#endif
         tmp++;
     }
 
@@ -2215,6 +2385,7 @@ image_t	*R_FindImage (char *name, imagetype_t type)
 	// don't try again to load an image that just failed
 	if (R_CheckImgFailed (name))
 	{
+#if !KINGPIN
 		if (!strcmp(name+len-4, ".tga"))
 		{
 #ifdef PNG_SUPPORT
@@ -2237,10 +2408,13 @@ image_t	*R_FindImage (char *name, imagetype_t type)
 			return R_FindImage(s,type);
 		}
 #endif	// PNG_SUPPORT
+
 		else
+#endif
 			return NULL;
 	}
 
+#if !KINGPIN
 	// MrG's automatic JPG & TGA loading
 	// search for TGAs or JPGs to replace .pcx and .wal images
 	if (!strcmp(name+len-4, ".pcx") || !strcmp(name+len-4, ".wal"))
@@ -2252,7 +2426,7 @@ image_t	*R_FindImage (char *name, imagetype_t type)
 		if (image)
 			return image;
 	}
-
+#endif
 	//
 	// load the pic from disk
 	//
@@ -2261,9 +2435,15 @@ image_t	*R_FindImage (char *name, imagetype_t type)
 
 	if (!strcmp(name+len-4, ".pcx"))
 	{
+#if !KINGPIN
 		LoadPCX (name, &pic, &palette, &width, &height);
 		if (pic)
 			image = R_LoadPic (name, pic, width, height, type, 8);
+#else
+		LoadPCX2 (name, &pic, &palette, &width, &height);
+		if (pic)
+			image = R_LoadPic (name, pic, width, height, type, 32); //hypov8 was 8bit
+#endif
 		else
 			image = NULL;
 	}
@@ -2504,6 +2684,20 @@ void R_InitImages (void)
 	// init intensity conversions
 	//r_intensity = Cvar_Get ("r_intensity", "2", CVAR_ARCHIVE);
 
+#if !KINGPIN
+	// Knightmare- added Vic's RGB brightening
+	if (glConfig.mtexcombine)
+		r_intensity = Cvar_Get ("intensity", "1", 0);
+	else
+		r_intensity = Cvar_Get ("intensity", "2", 0);
+	// end Knightmare
+
+	if ( r_intensity->value <= 1 )
+		Cvar_Set( "intensity", "1" );
+
+	if ( r_intensity->value >= 2 )
+		Cvar_Set( "intensity", "2" );
+#else
 	// Knightmare- added Vic's RGB brightening
 	if (glConfig.mtexcombine)
 		r_intensity = Cvar_Get ("r_intensity", "1", 0);
@@ -2513,7 +2707,10 @@ void R_InitImages (void)
 
 	if ( r_intensity->value <= 1 )
 		Cvar_Set( "r_intensity", "1" );
+	if ( r_intensity->value >= 2 )
+		Cvar_Set( "intensity", "2" );
 
+#endif
 	glState.inverse_intensity = 1 / r_intensity->value;
 
 	R_InitFailedImgList (); // Knightmare added

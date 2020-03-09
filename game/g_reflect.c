@@ -197,7 +197,7 @@ void ReflectSteam (vec3_t origin,vec3_t movedir,int count,int sounds,int speed, 
 
 		// If p1 is within func_reflect, we assume p2 is also. If map is constructed 
 		// properly this should always be true.
-
+#if !KINGPIN //hypov8 todo: dll
 		gi.WriteByte (svc_temp_entity);
 		gi.WriteByte (TE_STEAM);
 		gi.WriteShort (nextid);
@@ -208,6 +208,7 @@ void ReflectSteam (vec3_t origin,vec3_t movedir,int count,int sounds,int speed, 
 		gi.WriteShort (speed);
 		gi.WriteLong (wait);
 		gi.multicast (org, MULTICAST_PVS);
+#endif
 	}
 }
 
@@ -272,7 +273,9 @@ void ReflectSparks (int type,vec3_t origin,vec3_t movedir)
 		gi.WriteByte(svc_temp_entity);
 		gi.WriteByte(type);
 		gi.WritePosition(org);
+#if !KINGPIN //hypov8 todo: dll
 		if(type != TE_CHAINFIST_SMOKE) 
+#endif
 			gi.WriteDir(dir);
 		gi.multicast(org, MULTICAST_PVS);
 

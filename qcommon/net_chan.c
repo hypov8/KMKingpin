@@ -239,6 +239,11 @@ void Netchan_Transmit (netchan_t *chan, int length, byte *data)
 
 
 // write the packet header
+#if !KINGPIN
+	if (chan->protocol == PROTOCOL_R1Q2)
+		SZ_Init (&send, send_buf, sizeof(send_buf));
+	else
+#endif
 	SZ_Init (&send, send_buf, sizeof(send_buf));
 
 	w1 = ( chan->outgoing_sequence & ~(1<<31) ) | (send_reliable<<31);
@@ -307,7 +312,7 @@ qboolean Netchan_Process (netchan_t *chan, sizebuf_t *msg)
 	sequence = MSG_ReadLong (msg);
 	sequence_ack = MSG_ReadLong (msg);
 
-	// read the qport if we are a server
+	// read the qport if we are a server //#if KINGPIN //hypov8 todo: ok?
 	if (chan->sock == NS_SERVER)
 		qport = MSG_ReadShort (msg);
 

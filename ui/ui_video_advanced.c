@@ -72,9 +72,13 @@ static void Video_Advanced_MenuSetValues ( void )
 	Cvar_SetValue( "r_modulate", ClampCvar( 1, 2, Cvar_VariableValue("r_modulate") ) );
 	s_lightmapscale_slider.curvalue = (Cvar_VariableValue("r_modulate") -1) * 10;
 
+#if !KINGPIN
+	Cvar_SetValue( "intensity", ClampCvar( 1, 2, Cvar_VariableValue("intensity") ) );
+	s_textureintensity_slider.curvalue = (Cvar_VariableValue("intensity") -1) * 10;
+#else
 	Cvar_SetValue( "r_intensity", ClampCvar( 1, 2, Cvar_VariableValue("r_intensity") ) );
 	s_textureintensity_slider.curvalue = (Cvar_VariableValue("r_intensity") -1) * 10;
-
+#endif
 	Cvar_SetValue( "r_rgbscale", ClampCvar( 1, 2, Cvar_VariableValue("r_rgbscale") ) );
 	if (Cvar_VariableValue("r_rgbscale") == 1)
 		s_rgbscale_box.curvalue = 0;
@@ -148,7 +152,11 @@ static void LightMapScaleCallback ( void *unused )
 
 static void TextureIntensCallback ( void *unused )
 {
+#if !KINGPIN
+	Cvar_SetValue( "intensity", s_textureintensity_slider.curvalue / 10 + 1);
+#else
 	Cvar_SetValue( "r_intensity", s_textureintensity_slider.curvalue / 10 + 1);
+#endif
 }
 
 static void RGBSCaleCallback ( void *unused )
@@ -331,11 +339,13 @@ void Menu_Video_Advanced_Init (void)
 		0
 	};
 	int y = 0;
-
+#if! KINGPIN
+	r_intensity = Cvar_Get ("intensity", "1", 0);
+#else
 	r_intensity = Cvar_Get ("r_intensity", "1", 0);
-
-	s_video_advanced_menu.x = SCREEN_WIDTH*0.5;
-	s_video_advanced_menu.y = SCREEN_HEIGHT*0.5 - 100;
+#endif
+	s_video_advanced_menu.x = 460; //SCREEN_WIDTH*0.5;
+	s_video_advanced_menu.y = 100; // SCREEN_HEIGHT*0.5 - 100;
 	s_video_advanced_menu.nitems = 0;
 
 	s_options_advanced_header.generic.type		= MTYPE_SEPARATOR;
@@ -570,9 +580,12 @@ Menu_Video_Advanced_Draw
 void Menu_Video_Advanced_Draw (void)
 {
 	//int w, h;
-
+#if KINGPIN
+	M_Main_Draw();
+#else
 	// draw the banner
 	Menu_DrawBanner("m_banner_video");
+#endif
 
 	// move cursor to a reasonable starting position
 	Menu_AdjustCursor( &s_video_advanced_menu, 1 );

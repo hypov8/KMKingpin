@@ -9,7 +9,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 
 See the GNU General Public License for more details.
 
@@ -19,7 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-
+	
 // q_shared.h -- included first by ALL program modules
 
 #ifdef _MSC_VER	// _WIN32
@@ -64,7 +64,7 @@ typedef unsigned char 		byte;
 typedef enum {false, true}	qboolean;
 
 // 64-bit integer definitions
-#ifdef _WIN32
+#ifdef _WIN32 
 #  ifndef __GNUC__	// MSVC/Borland
 	typedef __int64 qint64;
 #  else	// Cygwin
@@ -86,8 +86,6 @@ typedef enum {false, true}	qboolean;
 	typedef long long qint64;
 #elif defined(R5900)	// PS2 EE
 	typedef long qint64;
-#elif defined(linux)
-  typedef int64_t qint64;
 #endif
 
 #ifndef NULL
@@ -144,11 +142,18 @@ __inline int Q_vsnprintf (char *Dest, size_t Count, const char *Format, va_list 
 
 #define PNG_SUPPORT // whether to include PNG image support
 
-#define USE_CURL	// whether to include HTTP downloading
+//#define USE_CURL	// whether to include HTTP downloading
 
 #define LOC_SUPPORT	// whether to include loc file support
 
-#define MD2_AS_MD3 // whether to load md2s into md3 memory representation
+#define MD2_AS_MD3 // whether to load md2s into md3 memory representation //hypov8 todo: whats the benefit?
+
+#if KINGPIN
+//#define MDX_AS_MD3 
+	#ifndef MDX_AS_MD3
+	#define PROJECTION_MDX_SHADOWS // whether to use projection shadows from BeefQuake
+	#endif
+#endif
 
 #ifndef MD2_AS_MD3
 #define PROJECTION_SHADOWS // whether to use projection shadows from BeefQuake
@@ -162,6 +167,31 @@ __inline int Q_vsnprintf (char *Dest, size_t Count, const char *Format, va_list 
 #define SAVEGAME_USE_FUNCTION_TABLE
 #define SAVEGAME_DLLNAME "Lazarus Quake II mod with CTF"
 #define SAVEGAME_VERSION 1
+
+
+	// MH: these seem fine with GCC/Linux too
+#if 1//def _WIN32 //KINGPIN //hypov8
+//#define FLOAT2INTCAST(f)(*((int32 *)(&f)))
+//#define FLOAT2UINTCAST(f)(*((uint32 *)(&f)))
+#define FLOAT2INTCAST(f)(*((int *)(&f))) //hypov8
+#define FLOAT2UINTCAST(f)(*((unsigned int *)(&f))) //hypov8
+
+#define FLOAT_LT_ZERO(f) (FLOAT2UINTCAST(f) > 0x80000000U)
+#define FLOAT_LE_ZERO(f) (FLOAT2INTCAST(f) <= 0)
+#define FLOAT_GT_ZERO(f) (FLOAT2INTCAST(f) > 0)
+#define FLOAT_GE_ZERO(f) (FLOAT2UINTCAST(f) <= 0x80000000U)
+// MH: support for -0
+#define	FLOAT_EQ_ZERO(f) ((FLOAT2INTCAST(f) & 0x7FFFFFFF) == 0)
+#define	FLOAT_NE_ZERO(f) ((FLOAT2INTCAST(f) & 0x7FFFFFFF) != 0)
+#else
+//gcc breaks ieee compatibility with -ffast-math? i guess since these break horribly on linux
+#define	FLOAT_LT_ZERO(f) ((f) < 0)
+#define FLOAT_LE_ZERO(f) ((f) <= 0)
+#define FLOAT_GT_ZERO(f) ((f) > 0)
+#define FLOAT_GE_ZERO(f) ((f) >= 0)
+#define	FLOAT_EQ_ZERO(f) ((f) == 0)
+#define	FLOAT_NE_ZERO(f) ((f) != 0)
+#endif
 
 // angle indexes
 #define	PITCH				0		// up / down
@@ -178,6 +208,27 @@ __inline int Q_vsnprintf (char *Dest, size_t Count, const char *Format, va_list 
 //
 // per-level limits
 //
+#if KINGPIN //hypov8
+#define	MAX_CLIENTS			256		// absolute limit
+#define	MAX_EDICTS			2048	// must change protocol to increase more
+#define	MAX_LIGHTSTYLES		256
+#define	MAX_MODELS			256		// these are sent over the net as bytes
+#define	MAX_SOUNDS			384		// so they cannot be blindly increased
+#define	MAX_IMAGES			256
+#define	MAX_ITEMS			256
+#define MAX_LIGHTFLARES		128
+#define MAX_JUNIOR_STRINGS	512
+#define MAX_GENERAL			(MAX_CLIENTS*2)	// general config strings
+
+//hypov8
+//Knightmare- hacked offsets for old demos
+#define	OLD_MAX_MODELS		256
+#define	OLD_MAX_SOUNDS		384
+#define	OLD_MAX_IMAGES		256
+#define	OLD_MAX_ITEMS		256
+//end Knightmare
+
+#else
 #define	MAX_CLIENTS			256		// absolute limit
 #ifdef KMQUAKE2_ENGINE_MOD		//Knightmare- increase MAX_EDICTS
 #define	MAX_EDICTS			8192	// must change protocol to increase more
@@ -205,6 +256,7 @@ __inline int Q_vsnprintf (char *Dest, size_t Count, const char *Format, va_list 
 
 #define	MAX_ITEMS			256
 #define MAX_GENERAL			(MAX_CLIENTS*2)	// general config strings
+#endif
 
 
 // game print flags
@@ -214,14 +266,18 @@ __inline int Q_vsnprintf (char *Dest, size_t Count, const char *Format, va_list 
 #define	PRINT_CHAT			3		// chat messages
 
 
-
 #define	ERR_FATAL			0		// exit the entire game with a popup window
 #define	ERR_DROP			1		// print to console and disconnect from game
 #define	ERR_DISCONNECT		2		// don't kill server
 
 #define	PRINT_ALL			0
 #define PRINT_DEVELOPER		      1		// only print when "developer 1"
-#define PRINT_ALERT			2
+#define PRINT_ALERT			2		
+
+#if KINGPIN
+#define EXPORT __cdecl
+#define IMPORT __cdecl
+#endif
 
 
 // destination class for gi.multicast()
@@ -317,6 +373,30 @@ extern long Q_ftol( float f );
 #define Vector4Set(v, w, x, y, z)	(v[0]=(w), v[1]=(x), v[2]=(y), v[3]=(z))
 
 void VectorMA (vec3_t veca, float scale, vec3_t vecb, vec3_t vecc);
+
+#if KINGPIN
+//performs comparison on encoded byte differences - pointless sending 0.00 -> 0.01 if both end up as 0 on net.
+#define Vec_ByteCompare(v1,v2) \
+	((int)(v1[0]*4)==(int)(v2[0]*4) && \
+	(int)(v1[1]*4)==(int)(v2[1]*4) && \
+	(int)(v1[2]*4) == (int)(v2[2]*4))
+
+#define Vec_RoughCompare(v1,v2) \
+	(*(int *)&(v1[0])== *(int *)&(v2[0]) && \
+	*(int *)&(v1[1]) == *(int *)&(v2[1]) && \
+	*(int *)&(v1[2]) == *(int *)&(v2[2]))
+
+#define Float_ByteCompare(v1,v2) \
+	((int)((v1)*8)==((int)((v2)*8)))
+
+#define Float_RoughCompare(v1,v2) \
+	(*(int *)&(v1) == *(int *)&(v2))
+
+#define Float_AngleCompare(v1,v2) \
+	(((int)((v1)*256/360) & 255) == ((int)((v2)*256/360) & 255))
+#endif
+
+
 
 // just in case you do't want to use the macros
 vec_t _DotProduct (vec3_t v1, vec3_t v2);
@@ -593,17 +673,50 @@ COLLISION DETECTION
 
 
 
-#define	SURF_LIGHT		0x1		// value will hold the light strength
+#define	SURF_LIGHT		0x1	/*1*/	// value will hold the light strength
 
-#define	SURF_SLICK		0x2		// effects game physics
+#define	SURF_SLICK		0x2	/*2*/	// effects game physics
 
-#define	SURF_SKY		0x4		// don't draw, but add to skybox
-#define	SURF_WARP		0x8		// turbulent water warp
-#define	SURF_TRANS33	0x10
-#define	SURF_TRANS66	0x20
-#define	SURF_FLOWING	0x40	// scroll towards angle
-#define	SURF_NODRAW		0x80	// don't bother referencing the texture
+#define	SURF_SKY		0x4		/*3*/		// don't draw, but add to skybox
+#define	SURF_WARP		0x8		/*4*/		// turbulent water warp
+#define	SURF_TRANS33	0x10	/*5*/	
+#define	SURF_TRANS66	0x20	/*6*/	
+#define	SURF_FLOWING	0x40	/*7*/		// scroll towards angle
+#define	SURF_NODRAW		0x80	/*8*/		// don't bother referencing the texture
 
+#if KINGPIN //hypov8
+//	hint				0x100	/*9*/		// Ridah, used for rendering, marks this surface as having been burnt or charred
+//	skip				0x200	/*10*/	
+#define	SURF_SPECULAR	0x400	/*11*/			// Ridah, shows specular lighting from light flares
+#define	SURF_DIFFUSE	0x800	/*12*/			// Ridah, used with specular lighting, makes it bigger and less intense
+#define SURF_ALPHA		0x1000	/*13*/		// wire fence effect flag
+#define	SURF_MIRROR		0x2000	/*14*/	 //add hypov8
+//	window33			0x4000	/*15*/	 //add hypov8
+//	window 66			0x8000	/*16*/	 //add hypov8
+//	x					0x10000	/*17*/	 //add hypov8
+//	x					0x20000	/*18*/	 //add hypov8
+//	x					0x40000	/*19*/	 //add hypov8
+
+
+#define SURF_WATER      0x80000		/*20*/	
+#define SURF_CONCRETE	0x100000	/*21*/	
+#define SURF_FABRIC		0x200000	/*22*/	
+#define SURF_GRAVEL		0x400000	/*23*/	
+#define SURF_METAL		0x800000	/*24*/	
+#define SURF_METAL_L	0x1000000	/*25*/	
+#define SURF_SNOW		0x2000000	/*26*/	
+#define SURF_TILE		0x4000000	/*27*/	
+#define SURF_WOOD		0x8000000	/*28*/	
+//	x					0x10000000	/*29*/	 //add hypov8
+//	x					0x20000000	/*30*/	 //add hypov8
+//	x					0x40000000	/*31*/	 //add hypov8
+#define SURF_NOLIGHTENV	0x80000000	/*32*/	// no lightmap or envmap trans/warp surface //hypov8 todo:
+
+#define SURF_ALPHATEST SURF_ALPHA //add hypov8
+#define SURF_STANDARD SURF_CONCRETE //hypov8 todo:??
+#define SURF_STEPMASK	0x00FFFC00 //hypov8 todo:??
+//#endif //hypov8
+#else
 //Knightmare 12/22/2001
 // Never used in the game, just here for completeness:
 #define	SURF_HINT		0x100	// make a primary bsp splitter
@@ -635,6 +748,7 @@ COLLISION DETECTION
 #define	SURF_CHOPPY2	0x40000000
 #define	SURF_CHOPPY3	0x80000000
 //end Knightmare
+#endif
 
 // content masks
 #define	MASK_ALL				(-1)
@@ -663,6 +777,11 @@ typedef struct cplane_s
 	byte	type;			// for fast side tests
 	byte	signbits;		// signx + (signy<<1) + (signz<<1)
 	byte	pad[2];
+#if KINGPIN //hypov8 todo: asm?
+	int		spec_updateframe;	// so we only do each plane once
+	int		spec_updateframe_backface;
+	byte	spec_render, spec_render_back;
+#endif
 } cplane_t;
 
 // structure offset for asm code
@@ -687,13 +806,13 @@ typedef struct csurface_s
 	char		name[16];
 	int			flags;
 	int			value;
-} csurface_t;
+} csurface_q2_t;
 
 typedef struct mapsurface_s  // used internally due to name len probs //ZOID
 {
-	csurface_t	c;
+	csurface_q2_t	c;
 	char		rname[32];
-} mapsurface_t;
+} mapsurface_q2_t;
 
 // a trace is returned when a box is swept through the world
 typedef struct
@@ -703,7 +822,7 @@ typedef struct
 	float		fraction;	// time completed, 1.0 = didn't hit anything
 	vec3_t		endpos;		// final position
 	cplane_t	plane;		// surface normal at impact
-	csurface_t	*surface;	// surface hit
+	csurface_q2_t	*surface;	// surface hit
 	int			contents;	// contents on other side of surface hit
 	struct edict_s	*ent;		// not set by CM_*() functions
 } trace_t;
@@ -712,10 +831,17 @@ typedef struct
 
 // pmove_state_t is the information necessary for client side movement
 // prediction
-typedef enum
+typedef enum 
 {
 	// can accelerate and turn
 	PM_NORMAL,
+#if KINGPIN //hypov8
+	PM_NORMAL_WITH_JETPACK,
+	PM_HOVERCAR,			// flying hovercar
+	PM_HOVERCAR_GROUND,		// grounded hovercar
+	PM_BIKE,				// motorcycle
+	PM_CAR,					// uses vehicle code
+#endif
 	PM_SPECTATOR,
 	// no acceleration or turning
 	PM_DEAD,
@@ -732,6 +858,9 @@ typedef enum
 #define	PMF_TIME_TELEPORT	32	// pm_time is non-moving time
 #define PMF_NO_PREDICTION	64	// temporarily disables prediction (used for grappling hook)
 
+#if KINGPIN //hypov8
+#define PMF_CHASECAM		128
+#endif
 // this structure needs to be communicated bit-accurate
 // from the server to the client to guarantee that
 // prediction stays in sync, so no floats are used.
@@ -752,6 +881,9 @@ typedef struct
 	short		gravity;
 	short		delta_angles[3];	// add to command angles to get view direction
 									// changed by spawns, rotating objects, and teleporters
+#if KINGPIN //hypov8
+	byte		runscale;		// Ridah, so we can mess with the running speed
+#endif
 } pmove_state_t;
 
 
@@ -803,6 +935,10 @@ typedef struct
 	// callbacks to test the world
 	trace_t		(*trace) (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end);
 	int			(*pointcontents) (vec3_t point);
+#if KINGPIN //hypov8 todo: trace?
+	int			footsteptype;
+	int			wall_collision;
+#endif
 } pmove_t;
 
 
@@ -906,45 +1042,60 @@ typedef struct
 //
 // muzzle flashes / player effects
 //
-#define	MZ_BLASTER			0
-#define MZ_MACHINEGUN		1
-#define	MZ_SHOTGUN			2
-#define	MZ_CHAINGUN1		3
-#define	MZ_CHAINGUN2		4
-#define	MZ_CHAINGUN3		5
-#define	MZ_RAILGUN			6
-#define	MZ_ROCKET			7
-#define	MZ_GRENADE			8
-#define	MZ_LOGIN			9
-#define	MZ_LOGOUT			10
-#define	MZ_RESPAWN			11
-#define	MZ_BFG			12
-#define	MZ_SSHOTGUN			13
-#define	MZ_HYPERBLASTER		14
-#define	MZ_ITEMRESPAWN		15
+#define	MZ_BLASTER			0 //v34 = "weapons/blastf1a.wav";
+#define MZ_MACHINEGUN		1 //"weapons/machinegun/machgf%ib.wav", v12 % 5 + 1);
+#define	MZ_SHOTGUN			2 //"weapons/shotgun/shotgf1b.wav"); ("weapons/shotgun/shotgr1b.wav");
+#define	MZ_CHAINGUN1		3 //"weapons/machinegun/machgf%ib.wav", v16 % 5 + 1);
+#define	MZ_CHAINGUN2		4 //"weapons/machinegun/machgf%ib.wav", v18 % 5 + 1);  "weapons/machinegun/machgf%ib.wav", v20 % 5 + 1);
+#define	MZ_CHAINGUN3		5 //"weapons/machinegun/machgf%ib.wav", v22 % 5 + 1);  "weapons/machinegun/machgf%ib.wav", v24 % 5 + 1); "weapons/machinegun/machgf%ib.wav", v26 % 5 + 1);
+#define	MZ_RAILGUN			6 //"weapons/railgf1a.wav";
+#define	MZ_ROCKET			7 //"weapons/rocket_launcher/rl_fire.wav";
+#define	MZ_GRENADE			8 //"weapons/grenade_launcher/gl_fire.wav";
+#define	MZ_LOGIN			9 //"misc/tele1.wav";
+#define	MZ_LOGOUT			10 //"misc/tele1.wav");
+#define	MZ_RESPAWN			11 //"misc/tele1.wav");
+#define	MZ_BFG				12 //
+#define	MZ_SSHOTGUN			13 //"weapons/shotgun/sshotf1b.wav";
+#define	MZ_HYPERBLASTER		14	//"weapons/hyprbf1a.wav";
+#define	MZ_ITEMRESPAWN		15 //no sound/effect
 // RAFAEL
-#define MZ_IONRIPPER		16
-#define MZ_BLUEHYPERBLASTER 17
-#define MZ_PHALANX			18
+#define MZ_IONRIPPER		16 //
+#define MZ_BLUEHYPERBLASTER 17 //"weapons/hyprbf1a.wav";
+#define MZ_PHALANX			18 //
 #define MZ_SILENCED			128		// bit flag ORed with one of the above numbers
 
 //ROGUE
-#define MZ_ETF_RIFLE		30
-#define MZ_UNUSED			31
-#define MZ_SHOTGUN2			32
-#define MZ_HEATBEAM			33
-#define MZ_BLASTER2			34
-#define	MZ_TRACKER			35
-#define	MZ_NUKE1			36
-#define	MZ_NUKE2			37
-#define	MZ_NUKE4			38
-#define	MZ_NUKE8			39
+#define MZ_ETF_RIFLE		30 //
+#define MZ_UNUSED			31 //
+#define MZ_SHOTGUN2			32 //
+#define MZ_HEATBEAM			33 //
+#define MZ_BLASTER2			34 //
+#define	MZ_TRACKER			35 //
+#define	MZ_NUKE1			36 //
+#define	MZ_NUKE2			37 //
+#define	MZ_NUKE4			38 //
+#define	MZ_NUKE8			39 //
 //Knightmare 1/3/2002- blue blaster and green hyperblaster
-#define	MZ_BLUEBLASTER		40
-#define	MZ_GREENHYPERBLASTER	41
-#define	MZ_REDBLASTER		42
-#define	MZ_REDHYPERBLASTER	43
+#define	MZ_BLUEBLASTER		40 //
+#define	MZ_GREENHYPERBLASTER	41 //
+#define	MZ_REDBLASTER		42 //
+#define	MZ_REDHYPERBLASTER	43 //
 //end Knightmare
+
+#if KINGPIN
+
+#define	MZ_PISTOLA	19		//		sub_434DA0(&Args, 64, "weapons/pistol/pistola%i.wav", v10 + 1);
+#define	MZ_PIPE		20		//"weapons/melee/swing.wav"
+#define	MZ_SILENCER 22		//v34 = "weapons/pistol/silencer.wav";
+#define	MZ_PISTOLF	23		//sub_434DA0(&Args, 64, "weapons/pistol/pistolf%i.wav", v11 + 1);
+#define	MZ_CROWBAR	24		//"weapons/melee/swing.wav"
+#define	MZ_HMG		26	//"weapons/hmg/hmg.wav";
+#define	MZ_HMG_SIL	27	//silenced
+
+
+//hypov8 todo 
+//#define MZ_SILENCED			128		// bit flag ORed with one of the above numbers
+#endif
 
 //ROGUE
 
@@ -1184,7 +1335,9 @@ typedef struct
 //Mappack - new monster firing vectors
 #define	MZ2_SUPERTANK_GRENADE_1			211
 #define	MZ2_SUPERTANK_GRENADE_2			212
-
+#if KINGPIN
+#define MZ3_LEADHIT_METAL				1
+#endif
 extern	vec3_t monster_flash_offset [];
 
 
@@ -1196,6 +1349,67 @@ extern	vec3_t monster_flash_offset [];
 // and broadcast.
 typedef enum
 {
+#if KINGPIN //hypov8
+	TE_GUNSHOT,
+	TE_GUNSHOT_VISIBLE,
+	TE_BLOOD,
+	TE_BLASTER,
+	TE_RAILTRAIL,
+	TE_SHOTGUN,
+	TE_EXPLOSION1,
+	TE_EXPLOSION2,
+	TE_ROCKET_EXPLOSION,
+	TE_GRENADE_EXPLOSION,
+	TE_METAL_SPARKS,
+	TE_SPARKS,
+	TE_SPLASH,
+	TE_BUBBLETRAIL,
+	TE_SCREEN_SPARKS,
+	TE_SHIELD_SPARKS,
+	TE_BULLET_SPARKS,
+	TE_LASER_SPARKS,
+	TE_PARASITE_ATTACK,
+	TE_ROCKET_EXPLOSION_WATER,
+	TE_GRENADE_EXPLOSION_WATER,
+	TE_MEDIC_CABLE_ATTACK,
+	TE_BFG_EXPLOSION,
+	TE_BFG_BIGEXPLOSION,
+	TE_BOSSTPORT,
+	TE_BFG_LASER,
+	TE_GRAPPLE_CABLE,
+	TE_WELDING_SPARKS,
+	TE_GREENBLOOD,
+	TE_BLUEHYPERBLASTER,
+	TE_PLASMA_EXPLOSION,
+	TE_TUNNEL_SPARKS,
+	TE_SFXFIRE,
+	TE_SFXSMOKE,
+	TE_SFXFIREGO,
+	TE_SUN_FLARE,
+	TE_GUN_FLARE,
+	TE_SNOW,
+	TE_RAIN,
+	TE_LIGHT_FLARE,
+	TE_BLOOD_DRIP,
+	TE_BLOOD_SPLAT,
+	TE_BLOOD_POOL,
+	TE_SURFACE_SPRITE_ENTITY,
+	TE_BURN_TO_A_CRISP,
+	TE_CONCUSSION_EXPLOSION,
+	TE_CONCUSSION_EXPLOSION_WATER,
+	TE_EXPLOSION1B,
+	TE_IMPACT,
+	TE_EXPLOSION1C,
+	TE_SFXSTEAM,
+	TE_SFXSMOKE2,
+	TE_IMPACT_CONCUSSION,
+	TE_ART_BURN,
+	TE_FOG_BRUSH,
+	TE_GIBS,
+	TE_CONCUSSION_EXPLOSION_BIG,
+	TE_BARMACHINGUN,
+	TE_SFXFIRET
+#else
 	TE_GUNSHOT,				//0
 	TE_BLOOD,				//1
 	TE_BLASTER,				//2
@@ -1259,6 +1473,7 @@ typedef enum
 	TE_SHOCKSPLASH,			//57
 	TE_BLASTER_COLORED,		//58
 	TE_RAILTRAIL_COLORED,	//59
+#endif
 } temp_event_t;
 
 #define SPLASH_UNKNOWN		0
@@ -1283,6 +1498,12 @@ typedef enum
 #define	CHAN_NO_PHS_ADD			8	// send to all clients, not just ones in PHS (ATTN 0 will also do this)
 #define	CHAN_RELIABLE			16	// send by reliable message, not datagram
 
+#if KINGPIN
+//R1Q2 SPECIFIC XXX
+#define	CHAN_SERVER_ATTN_CALC	32
+// MH: send only to clients in PVS
+#define CHAN_PVS				64
+#endif
 
 // sound attenuation values
 #define	ATTN_NONE               0	// full volume the entire level
@@ -1292,6 +1513,48 @@ typedef enum
 
 
 // player_state->stats[] indexes
+#if KINGPIN //hypov8
+#define STAT_CASH_PICKUP        0
+#define	STAT_HEALTH				1
+#define	STAT_AMMO_ICON			2
+#define	STAT_AMMO				3
+#define	STAT_ARMOR1				4
+#define	STAT_ARMOR2				5
+#define	STAT_ARMOR3				6
+#define	STAT_PICKUP_ICON		7
+#define	STAT_PICKUP_STRING		8
+#define	STAT_ENDPIC				9
+#define	STAT_TIMER				10
+#define	STAT_HELPICON			11
+#define	STAT_SELECTED_ITEM		12
+#define	STAT_LAYOUTS			13
+#define	STAT_FRAGS				14
+#define	STAT_FLASHES			15		// cleared each frame, 1 = health, 2 = armor
+#define STAT_CASH				16
+#define STAT_PICKUP_COUNT		17
+#define STAT_CLIP				18
+#define STAT_CLIP_ICON			19
+#define STAT_HUD_INV			20
+// Following are duplicated for deathmatch, so beware if changing!
+#define STAT_HUD_ENEMY_TALK		21
+#define STAT_HUD_SELF_TALK		22
+#define STAT_HUD_ENEMY_TALK_TIME 23
+#define STAT_HUD_SELF_TALK_TIME 24
+#define STAT_FORCE_HUD			25
+#define STAT_HUD_HIRE1			26
+#define STAT_HUD_HIRE2			27
+#define STAT_HUD_HIRE1_CMD		28
+#define STAT_HUD_HIRE2_CMD		29
+// Ridah, duplicated these for use in teamplay, since they aren't used at all in multiplay
+#define STAT_BAGCASH			21
+#define STAT_DEPOSITED			22
+#define STAT_TEAM1_SCORE		26
+#define STAT_TEAM2_SCORE		27
+#define STAT_TEAM1_FLASH		28		// 0 - no flash, 1 - green, 2 - red
+#define STAT_TEAM2_FLASH		29		// 0 - no flash, 1 - green, 2 - red
+#define STAT_HIDE_HUD           30
+#define STAT_SWITCH_CAMERA      31
+#else
 #define STAT_HEALTH_ICON		0
 #define	STAT_HEALTH				1
 #define	STAT_AMMO_ICON			2
@@ -1318,8 +1581,8 @@ typedef enum
 #define STAT_MAXARMOR			253
 #define STAT_MAXHEALTH			254
 #define STAT_WEAPON				255
-
-#ifdef KMQUAKE2_ENGINE_MOD // Knightmare increased
+#endif
+#if!KINGPIN  //def KMQUAKE2_ENGINE_MOD // Knightmare increased //hypov8
 #define	MAX_STATS				256
 #else
 #define	MAX_STATS				32
@@ -1411,6 +1674,51 @@ ROGUE - VERSIONS
 // the server to all connected clients.
 // Each config string can be at most MAX_QPATH characters.
 //
+#if KINGPIN //hypov8
+#define	CS_NAME				0
+#define	CS_CDTRACK			1
+#define CS_DENSITY			2
+#define CS_FOGVAL			3
+#define CS_DENSITY2			4
+#define CS_FOGVAL2			5
+#define	CS_SKY				6
+#define	CS_STATUSBAR		7		// display program string
+
+#define CS_AIRACCEL			29 		//hypov8 todo: used in ctf. fix?
+
+#define	CS_SERVER_VERSION	29		// so new clients can decide which version of download code to use
+#define	CS_MAXCLIENTS		30
+#define	CS_MAPCHECKSUM		31		// for catching cheater maps
+
+#define	CS_MODELS			32
+#define	CS_SOUNDS			(CS_MODELS+MAX_MODELS)
+#define	CS_IMAGES			(CS_SOUNDS+MAX_SOUNDS)
+#define CS_MODELSKINS		(CS_IMAGES+MAX_IMAGES)
+#define	CS_LIGHTS			(CS_MODELSKINS+MAX_MODELS)
+#define	CS_ITEMS			(CS_LIGHTS+MAX_LIGHTSTYLES)
+#define	CS_PLAYERSKINS		(CS_ITEMS+MAX_ITEMS)
+#define	CS_LIGHTFLARES		(CS_PLAYERSKINS+MAX_CLIENTS)
+#define	CS_JUNIORS			(CS_LIGHTFLARES+MAX_LIGHTFLARES)
+#define CS_GENERAL			(CS_JUNIORS+MAX_JUNIOR_STRINGS)
+#define	CS_PAKFILE			(CS_GENERAL+MAX_GENERAL) //hypov8 todo: is this ok?
+#define	MAX_CONFIGSTRINGS	(CS_PAKFILE+1)
+
+//hypov8 duplicate of above. kp uses legacy porotocol 4 now
+//Knightmare- hacked configstring offsets for old demos
+#define OLD_CS_SOUNDS			(CS_MODELS+OLD_MAX_MODELS)
+#define	OLD_CS_IMAGES			(OLD_CS_SOUNDS+OLD_MAX_SOUNDS)
+#define OLD_CS_MODELSKINS		(OLD_CS_IMAGES+OLD_MAX_IMAGES) //add hypov8
+#define	OLD_CS_LIGHTS			(OLD_CS_MODELSKINS+OLD_MAX_MODELS)
+#define	OLD_CS_ITEMS			(OLD_CS_LIGHTS+MAX_LIGHTSTYLES)
+#define	OLD_CS_PLAYERSKINS		(OLD_CS_ITEMS+OLD_MAX_ITEMS)
+#define	OLD_CS_LIGHTFLARES		(OLD_CS_PLAYERSKINS+MAX_CLIENTS) //add hypov8
+#define	OLD_CS_JUNIORS			(OLD_CS_LIGHTFLARES+MAX_LIGHTFLARES) //add hypov8
+#define OLD_CS_GENERAL			(OLD_CS_JUNIORS+MAX_JUNIOR_STRINGS)
+#define	OLD_MAX_CONFIGSTRINGS	(OLD_CS_GENERAL+MAX_GENERAL)
+//end Knightmare
+
+
+#else
 #define	CS_NAME				0
 #define	CS_CDTRACK			1
 #define	CS_SKY				2
@@ -1433,7 +1741,6 @@ ROGUE - VERSIONS
 #define	MAX_CONFIGSTRINGS	(CS_PAKFILE+1)
 //#define	MAX_CONFIGSTRINGS	(CS_GENERAL+MAX_GENERAL)
 
-
 //Knightmare- hacked configstring offsets for old demos
 #define OLD_CS_SOUNDS			(CS_MODELS+OLD_MAX_MODELS)
 #define	OLD_CS_IMAGES			(OLD_CS_SOUNDS+OLD_MAX_SOUNDS)
@@ -1443,6 +1750,7 @@ ROGUE - VERSIONS
 #define OLD_CS_GENERAL			(OLD_CS_PLAYERSKINS+MAX_CLIENTS)
 #define	OLD_MAX_CONFIGSTRINGS	(OLD_CS_GENERAL+MAX_GENERAL)
 //end Knightmare
+#endif
 
 // From Q2Pro
 // Some mods actually exploit CS_STATUSBAR to take space up to CS_AIRACCEL
@@ -1459,6 +1767,36 @@ ROGUE - VERSIONS
 // All muzzle flashes really should be converted to events...
 typedef enum
 {
+#if KINGPIN
+	EV_NONE,
+	EV_ITEM_RESPAWN,
+	EV_FOOTSTEP0,
+	EV_FOOTSTEP1,
+	EV_FOOTSTEP2,
+	EV_FOOTSTEP3,
+	EV_FOOTSTEP4,
+	EV_FOOTSTEP5,
+	EV_FOOTSTEP6, //wood land
+	EV_FOOTSTEP7, //wood walk
+	// JOSEPH 26-JAN-99
+	EV_FOOTSTEP8,
+	// END JOSEPH
+	EV_FALLSHORT0,
+	EV_FALLSHORT1,
+	EV_FALLSHORT2,
+	EV_FALLSHORT3,
+	EV_FALLSHORT4,
+	EV_FALLSHORT5,
+	EV_FALLSHORT6,
+	EV_FALLSHORT7,
+	// JOSEPH 26-JAN-99
+	EV_FALLSHORT8,
+	// END JOSEPH	
+	EV_FALL,
+	EV_FALLFAR,
+	EV_PLAYER_TELEPORT,
+	EV_OTHER_TELEPORT
+#else
 	EV_NONE,
 	EV_ITEM_RESPAWN,
 	EV_FOOTSTEP,
@@ -1474,8 +1812,74 @@ typedef enum
 	EV_WADE_MUD, //wading in mud
 	EV_CLIMB_LADDER //climbing ladder
 	//end Knightmare
+#endif
 } entity_event_t;
 
+#if KINGPIN //hypov8
+typedef struct
+{
+	vec3_t	mins, maxs;
+} object_bounds_t;
+
+#define	MAX_MODEL_PARTS			8	// must change network code to increase this (also savegame code)
+#define	MAX_MODELPART_OBJECTS	8	// absolutely do not change, bound by "invisible_objects" bit-flags
+
+typedef struct model_part_s
+{
+// Ridah, MDX, ENABLE the following line when .mdx system goes online
+	int		modelindex;					// leave as 0 if blank
+
+//	int		invisible_objects;			// bit flags that define which sub-parts NOT to display when SET
+	byte	invisible_objects;			// bit flags that define which sub-parts NOT to display when SET
+	byte	skinnum[MAX_MODELPART_OBJECTS];
+
+	// server-only data used for collision detection, etc
+	int		object_bounds[MAX_MODELPART_OBJECTS];	// read in and allocated immediately after setting the modelindex
+	char	*objectbounds_filename;			// so we can restore the object bounds data when loading a savegame
+
+	int     baseskin;
+	byte	hitpoints[MAX_MODELPART_OBJECTS];
+	byte	hit_scale[MAX_MODELPART_OBJECTS]; // 0-250
+
+	int		currentSkin[MAX_MODELPART_OBJECTS];
+	int		oldSkinIndex; //hypov8 add: store skin id so we dont keep searching for it
+	struct image_s	*oldSkin;
+} model_part_t;
+
+#define	MAX_MODEL_DIR_LIGHTS	3		// bound to 8 by network code
+
+typedef struct
+{
+	int		light_indexes[MAX_MODEL_DIR_LIGHTS];	// so we can tell the client to use a certain light index, and it knows the details for that light
+
+	vec3_t	light_vecs[MAX_MODEL_DIR_LIGHTS];		// static light directions that touch this model (dynamic are added in ref_gl)
+	vec3_t	light_colors[MAX_MODEL_DIR_LIGHTS];
+	float	light_intensities[MAX_MODEL_DIR_LIGHTS];	// 0.0 -> 1.0
+	byte	light_styles[MAX_MODEL_DIR_LIGHTS];
+	int		num_dir_lights;
+
+	// below this doesn't get sent to client (only used at server side)
+	vec3_t	light_orgs[MAX_MODEL_DIR_LIGHTS];
+
+} model_lighting_t;
+
+typedef struct flamejunc_s
+{
+	vec3_t	org, vel;
+	float	start_width, end_width, start_height, end_height;	
+	float	lifetime, fadein_time;
+	float	start_alpha, end_alpha;
+
+	// current values
+	float	aged, alpha;
+	float	width, height;
+
+	vec3_t	unitvel;
+	int		hit_wall;
+
+	struct flamejunc_s	*next;
+} flamejunc_t;
+#endif
 
 // entity_state_t is the information conveyed from the server
 // in an update message about entities that the client will
@@ -1511,6 +1915,32 @@ typedef struct entity_state_s
 	int		event;			// impulse events -- muzzle flashes, footsteps, etc
 							// events only go out for a single frame, they
 							// are automatically cleared each frame
+#if KINGPIN //hypov8
+	int		renderfx2;
+
+	// Ridah, MDX, making way for .mdx system..
+	int		num_parts;
+	model_part_t	model_parts[MAX_MODEL_PARTS];
+	// done.
+
+	// Ridah, new lighting data
+	model_lighting_t	model_lighting;
+
+	vec3_t	last_lighting_update_pos;	// so we only calculate when a good distance from the last checked position
+	vec3_t	last_lighting_vec_update_pos;	// set when we update the vecs
+
+	// Ridah, flamethrower (only used on client-side)
+	flamejunc_t	*flamejunc_head;
+	// JOSEPH 15-APR-99
+	flamejunc_t	*flamejunc_head2;
+	// END JOSEPH
+	int	last_time, prev_last_time;		// time of last call to CL_FlameEffects() for this entity
+	byte		broken_flag;			// set if we release the trigger, so next time we fire, we can free all current flames
+
+//hypov8	float	alpha;			// set in CL_AddPacketEntities() from entity_state->effects
+
+	float	scale;			// ranges from 0.0 -> 2.0
+#endif
 } entity_state_t;
 
 //==============================================
@@ -1551,17 +1981,22 @@ typedef struct
 #endif							//end Knightmare
 
 	float		blend[4];		// rgba full screen effect
-
+	
 	float		fov;			// horizontal field of view
 
 	int			rdflags;		// refdef flags
 
 	short		stats[MAX_STATS];		// fast status bar updates
+#if KINGPIN //hypov8
+ 	int			num_parts;
+ 	model_part_t	model_parts[MAX_MODEL_PARTS];
+	int			weapon_usage;
+#endif
 } player_state_t;
 
 
 // ==================
-// PGM
+// PGM 
 #define VIDREF_GL		1
 #define VIDREF_SOFT		2
 #define VIDREF_OTHER	3
@@ -1569,3 +2004,4 @@ typedef struct
 extern int vidref_val;
 // PGM
 // ==================
+

@@ -42,6 +42,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // the "gameversion" client command will print this plus compile date
 #define	GAMEVERSION	"lazarus"
 
+#if !KINGPIN
 // protocol bytes that can be directly added to messages
 #define	svc_muzzleflash		1
 #define	svc_muzzleflash2	2
@@ -50,7 +51,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define	svc_inventory		5
 #define	svc_stufftext		11
 #define	svc_fog				21
+#else
+#define	svc_muzzleflash		1
+#define	svc_muzzleflash2	2
+#define	svc_muzzleflash3	3
+#define	svc_temp_entity		4
+#define	svc_layout			5
+#define	svc_inventory		6
+#define	svc_stufftext		13
+#define	svc_fog				27
 
+#endif
 //==================================================================
 
 // Lazarus: When visibility is reduced below this level, aiming accuracy suffers:
@@ -1001,7 +1012,7 @@ gitem_t	*GetItemByIndex (int index);
 int GetMaxAmmoByIndex (gclient_t *client, int item_index); // Knightmare added
 int GetMaxArmorByIndex (int item_index); // Knightmare added
 qboolean Add_Ammo (edict_t *ent, gitem_t *item, int count);
-void Touch_Item (edict_t *ent, edict_t *other, cplane_t *plane, csurface_t *surf);
+void Touch_Item (edict_t *ent, edict_t *other, cplane_t *plane, csurface_q2_t *surf);
 
 #ifdef JETPACK_MOD
 void Use_Jet (edict_t *ent, gitem_t *item);
@@ -1684,7 +1695,7 @@ struct edict_s
 	void		(*think)(edict_t *self);
 	void		(*postthink) (edict_t *ent); //Knightmare added
 	void		(*blocked)(edict_t *self, edict_t *other);	//move to moveinfo?
-	void		(*touch)(edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf);
+	void		(*touch)(edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf);
 	void		(*use)(edict_t *self, edict_t *other, edict_t *activator);
 	void		(*pain)(edict_t *self, edict_t *other, float kick, int damage);
 	void		(*die)(edict_t *self, edict_t *inflictor, edict_t *attacker, int damage, vec3_t point);

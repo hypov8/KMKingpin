@@ -32,7 +32,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 =============================================================
 */
 
-vec3_t	tempVertexArray[MD3_MAX_MESHES][MD3_MAX_VERTS];
+vec3_t	tempVertexArray[MD3_MAX_MESHES][MD3_MAX_VERTS*3]; //hypov8 curupted models with unwelded UV wll overver flow this.. should be  MD3_MAX_TRIANGLES*3
 
 vec3_t	aliasLightDir;
 float	aliasShadowAlpha;
@@ -257,7 +257,7 @@ void RB_RenderAliasMesh (maliasmodel_t *paliashdr, unsigned meshnum, unsigned sk
 R_DrawAliasMeshes
 =================
 */
-void R_DrawAliasMeshes (maliasmodel_t *paliashdr, entity_t *e, qboolean lerpOnly, qboolean mirrored)
+void R_DrawAliasMeshes(maliasmodel_t *paliashdr, entity_t *e, qboolean lerpOnly, qboolean mirrored)
 {
 	int				i, k, meshnum, skinnum, baseindex;	// numCalls
 	maliasframe_t	*frame, *oldframe;
@@ -265,13 +265,14 @@ void R_DrawAliasMeshes (maliasmodel_t *paliashdr, entity_t *e, qboolean lerpOnly
 	maliasvertex_t	*v, *ov;
 	vec3_t			move, delta, vectors[3];
 	vec3_t			curScale, oldScale, curNormal, oldNormal;
-	vec3_t			tempNormalsArray[MD3_MAX_VERTS];
+	vec3_t			tempNormalsArray[MD3_MAX_TRIANGLES]; // MD3_MAX_VERTS]; //hypov8 overflow with curupt models and unwelded UV
 	vec2_t			tempSkinCoord;
 	vec3_t			meshlight, lightcolor;
 	float			alpha, meshalpha, thisalpha, shellscale, frontlerp, backlerp = e->backlerp, mirrormult;
 	image_t			*skin;
 	renderparms_t	skinParms;
 	qboolean		shellModel = e->flags & RF_MASK_SHELL;
+	int temphypov8 = 0;
 
 	frontlerp = 1.0 - backlerp;
 
@@ -281,6 +282,9 @@ void R_DrawAliasMeshes (maliasmodel_t *paliashdr, entity_t *e, qboolean lerpOnly
 		alpha = e->alpha;
 	else
 		alpha = 1.0;
+
+	if (!strcmp(e->model->name, "models/weapons/v_colt/pistol.mdx"))
+		temphypov8 = 1;
 
 	frame = paliashdr->frames + e->frame;
 	oldframe = paliashdr->frames + e->oldframe;
@@ -340,6 +344,13 @@ void R_DrawAliasMeshes (maliasmodel_t *paliashdr, entity_t *e, qboolean lerpOnly
 		if (skinParms.nodraw) 
 			continue; // skip this mesh for this skin
 
+		//hypov8 break out of faulty models
+		if (mesh.num_verts > (mesh.num_tris * 3))
+			continue;
+		if (mesh.num_verts <0)
+			continue;
+
+
 		if (skinParms.fullbright)
 			VectorSet(meshlight, 1.0f, 1.0f, 1.0f);
 		else
@@ -386,8 +397,12 @@ void R_DrawAliasMeshes (maliasmodel_t *paliashdr, entity_t *e, qboolean lerpOnly
 					mirrormult * (move[1] + ov->xyz[1]*oldScale[1] + v->xyz[1]*curScale[1] + tempNormalsArray[i][1]*shellscale),
 					move[2] + ov->xyz[2]*oldScale[2] + v->xyz[2]*curScale[2] + tempNormalsArray[i][2]*shellscale );
 
+			/*if (temphypov8 && i == 198) //hypov8 debug?
+				Com_Printf("xyz (%f, %f, %f)\n", tempVertexArray[meshnum][i][0], tempVertexArray[meshnum][i][1], tempVertexArray[meshnum][i][2]);
+				*/
 			// skip drawing if we're only lerping the verts for a shadow-only rendering pass
-			if (lerpOnly)	continue;
+			if (lerpOnly)	
+				continue;
 
 			tempNormalsArray[i][1] *= mirrormult;
 
@@ -419,7 +434,7 @@ void R_DrawAliasMeshes (maliasmodel_t *paliashdr, entity_t *e, qboolean lerpOnly
 
 		// compare renderparms for next mesh and check for overflow
 		if ( k < (paliashdr->num_meshes-1) ) {
-			if ( ( shellModel || R_AliasMeshesAreBatchable (paliashdr, k, k+1, e->skinnum) )
+			if ( ( shellModel || R_AliasMeshesAreBatchable (paliashdr, k+0, k+1, e->skinnum) )
 				&& !RB_CheckArrayOverflow (paliashdr->meshes[k+1].num_verts, paliashdr->meshes[k+1].num_tris*3) )
 				continue;
 		}
@@ -990,8 +1005,10 @@ void R_DrawAliasModel (entity_t *e)
 	}
 	else if (e->renderfx & RF2_CAMERAMODEL)
 	{
+#if !KINGPIN
 		if (r_lefthand->value == 1)
 			mirrormodel = true;
+#endif
 	}
 	else if (e->flags & RF_MIRRORMODEL)
 		mirrormodel = true;

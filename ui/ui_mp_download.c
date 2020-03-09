@@ -103,9 +103,9 @@ void DownloadOptions_MenuInit( void )
 	};
 	int y = 0;
 
-	s_downloadoptions_menu.x = SCREEN_WIDTH*0.5;
-//	s_downloadoptions_menu.x = viddef.width * 0.50;
-//	s_downloadoptions_menu.y = 0;
+	s_downloadoptions_menu.x = SCREEN_WIDTH*0.5 + 130;
+	s_downloadoptions_menu.x = 120; // viddef.width * 0.50;
+	s_downloadoptions_menu.y = -140;
 	s_downloadoptions_menu.nitems = 0;
 
 	s_download_title.generic.type = MTYPE_SEPARATOR;
@@ -194,9 +194,9 @@ void DownloadOptions_MenuInit( void )
 	Menu_AddItem( &s_downloadoptions_menu, &s_allow_download_sounds_box );
 
 	Menu_AddItem( &s_downloadoptions_menu, &s_download_back_action );
-
-	Menu_Center( &s_downloadoptions_menu );
-
+#if !KINGPIN
+	Menu_Center( &s_downloadoptions_menu ); //hypov8
+#endif
 	// skip over title
 	if (s_downloadoptions_menu.cursor == 0)
 		s_downloadoptions_menu.cursor = 1;
@@ -204,7 +204,11 @@ void DownloadOptions_MenuInit( void )
 
 void DownloadOptions_MenuDraw(void)
 {
+#if KINGPIN
+	M_Main_Draw();
+#else
 	Menu_DrawBanner( "m_banner_multiplayer" );
+#endif
 	Menu_Draw( &s_downloadoptions_menu );
 }
 

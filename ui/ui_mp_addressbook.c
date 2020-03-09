@@ -113,7 +113,9 @@ const char *AddressBook_MenuKey (int key)
 
 void AddressBook_MenuDraw (void)
 {
-	Menu_DrawBanner ("m_banner_addressbook");
+#if !KINGPIN
+	Menu_DrawBanner ("m_banner_addressbook"); //hypov8
+#endif
 	Menu_Draw (&s_addressbook_menu);
 }
 

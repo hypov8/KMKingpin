@@ -30,8 +30,8 @@ typedef struct
 typedef struct
 {
 	cplane_t	*plane;
-	mapsurface_t	*surface;
-} cbrushside_t;
+	mapsurface_q2_t	*surface;
+} cbrushside_q2_t;
 
 typedef struct
 {
@@ -40,7 +40,7 @@ typedef struct
 	int			area;
 	unsigned short	firstleafbrush;	// change to int
 	unsigned short	numleafbrushes;	// change to int
-} cleaf_t;
+} cleaf_q2_t;
 
 typedef struct
 {
@@ -48,7 +48,7 @@ typedef struct
 	int			numsides;
 	int			firstbrushside;
 	int			checkcount;		// to avoid repeated testings
-} cbrush_t;
+} cbrush_q2_t;
 
 typedef struct
 {
@@ -56,17 +56,17 @@ typedef struct
 	int		firstareaportal;
 	int		floodnum;			// if two areas have equal floodnums, they are connected
 	int		floodvalid;
-} carea_t;
+} carea_q2_t;
 
 int			checkcount;
 
 char		map_name[MAX_QPATH];
 
 int			numbrushsides;
-cbrushside_t map_brushsides[MAX_MAP_BRUSHSIDES];
+cbrushside_q2_t map_brushsides[MAX_MAP_BRUSHSIDES];
 
 int			numtexinfo;
-mapsurface_t	map_surfaces[MAX_MAP_TEXINFO];
+mapsurface_q2_t	map_surfaces[MAX_MAP_TEXINFO];
 
 int			numplanes;
 cplane_t	map_planes[MAX_MAP_PLANES+6];		// extra for box hull
@@ -75,7 +75,7 @@ int			numnodes;
 cnode_t		map_nodes[MAX_MAP_NODES+6];		// extra for box hull
 
 int			numleafs = 1;	// allow leaf funcs to be called without a map
-cleaf_t		map_leafs[MAX_MAP_LEAFS];
+cleaf_q2_t	map_leafs[MAX_MAP_LEAFS];
 int			emptyleaf, solidleaf;
 
 int			numleafbrushes;
@@ -85,24 +85,24 @@ int			numcmodels;
 cmodel_t	map_cmodels[MAX_MAP_MODELS];
 
 int			numbrushes;
-cbrush_t	map_brushes[MAX_MAP_BRUSHES];
+cbrush_q2_t	map_brushes[MAX_MAP_BRUSHES];
 
 int			numvisibility;
 byte		map_visibility[MAX_MAP_VISIBILITY];
-dvis_t		*map_vis = (dvis_t *)map_visibility;
+dvis_q2_t		*map_vis = (dvis_q2_t *)map_visibility;
 
 int			numentitychars;
 char		map_entitystring[MAX_MAP_ENTSTRING];
 
 int			numareas = 1;
-carea_t		map_areas[MAX_MAP_AREAS];
+carea_q2_t		map_areas[MAX_MAP_AREAS];
 
 int			numareaportals;
-dareaportal_t map_areaportals[MAX_MAP_AREAPORTALS];
+dareaportal_q2_t map_areaportals[MAX_MAP_AREAPORTALS];
 
 int			numclusters = 1;
 
-mapsurface_t	nullsurface;
+mapsurface_q2_t	nullsurface;
 
 int			floodvalid;
 
@@ -131,12 +131,12 @@ byte	*cmod_base;
 
 /*
 =================
-CMod_LoadSubmodels
+CMod_LoadSubmodels_Q2
 =================
 */
-void CMod_LoadSubmodels (lump_t *l)
+void CMod_LoadSubmodels_Q2 (lump_t *l)
 {
-	dmodel_t	*in;
+	dmodel_q2_t	*in;
 	cmodel_t	*out;
 	int			i, j, count;
 
@@ -166,16 +166,15 @@ void CMod_LoadSubmodels (lump_t *l)
 	}
 }
 
-
 /*
 =================
-CMod_LoadSurfaces
+CMod_LoadSurfaces_Q2
 =================
 */
-void CMod_LoadSurfaces (lump_t *l)
+void CMod_LoadSurfaces_Q2 (lump_t *l)
 {
-	texinfo_t	*in;
-	mapsurface_t	*out;
+	texinfo_q2_t	*in;
+	mapsurface_q2_t	*out;
 	int			i, count;
 
 	in = (void *)(cmod_base + l->fileofs);
@@ -199,16 +198,15 @@ void CMod_LoadSurfaces (lump_t *l)
 	}
 }
 
-
 /*
 =================
 CMod_LoadNodes
 
 =================
 */
-void CMod_LoadNodes (lump_t *l)
+void CMod_LoadNodes_Q2 (lump_t *l)
 {
-	dnode_t		*in;
+	dnode_q2_t	*in;
 	int			child;
 	cnode_t		*out;
 	int			i, j, count;
@@ -241,14 +239,14 @@ void CMod_LoadNodes (lump_t *l)
 
 /*
 =================
-CMod_LoadBrushes
+CMod_LoadBrushes_Q2
 
 =================
 */
-void CMod_LoadBrushes (lump_t *l)
+void CMod_LoadBrushes_Q2 (lump_t *l)
 {
-	dbrush_t	*in;
-	cbrush_t	*out;
+	dbrush_q2_t	*in;
+	cbrush_q2_t	*out;
 	int			i, count;
 	
 	in = (void *)(cmod_base + l->fileofs);
@@ -274,14 +272,14 @@ void CMod_LoadBrushes (lump_t *l)
 
 /*
 =================
-CMod_LoadLeafs
+CMod_LoadLeafs_Q2
 =================
 */
-void CMod_LoadLeafs (lump_t *l)
+void CMod_LoadLeafs_Q2 (lump_t *l)
 {
 	int			i;
-	cleaf_t		*out;
-	dleaf_t 	*in;
+	cleaf_q2_t		*out;
+	dleaf_q2_t 	*in;
 	int			count;
 	
 	in = (void *)(cmod_base + l->fileofs);
@@ -329,14 +327,14 @@ void CMod_LoadLeafs (lump_t *l)
 
 /*
 =================
-CMod_LoadPlanes
+CMod_LoadPlanes_Q2
 =================
 */
-void CMod_LoadPlanes (lump_t *l)
+void CMod_LoadPlanes_Q2 (lump_t *l)
 {
 	int			i, j;
 	cplane_t	*out;
-	dplane_t 	*in;
+	dplane_q2_t 	*in;
 	int			count;
 	int			bits;
 	
@@ -372,10 +370,10 @@ void CMod_LoadPlanes (lump_t *l)
 
 /*
 =================
-CMod_LoadLeafBrushes
+CMod_LoadLeafBrushes_Q2
 =================
 */
-void CMod_LoadLeafBrushes (lump_t *l)
+void CMod_LoadLeafBrushes_Q2 (lump_t *l)
 {
 	int			i;
 	unsigned short	*out;	// change to int
@@ -402,14 +400,14 @@ void CMod_LoadLeafBrushes (lump_t *l)
 
 /*
 =================
-CMod_LoadBrushSides
+CMod_LoadBrushSides_Q2
 =================
 */
-void CMod_LoadBrushSides (lump_t *l)
+void CMod_LoadBrushSides_Q2 (lump_t *l)
 {
 	int			i, j;
-	cbrushside_t	*out;
-	dbrushside_t 	*in;
+	cbrushside_q2_t	*out;
+	dbrushside_q2_t 	*in;
 	int			count;
 	int			num;
 
@@ -438,14 +436,14 @@ void CMod_LoadBrushSides (lump_t *l)
 
 /*
 =================
-CMod_LoadAreas
+CMod_LoadAreas_Q2
 =================
 */
-void CMod_LoadAreas (lump_t *l)
+void CMod_LoadAreas_Q2 (lump_t *l)
 {
 	int			i;
-	carea_t		*out;
-	darea_t 	*in;
+	carea_q2_t		*out;
+	darea_q2_t 	*in;
 	int			count;
 
 	in = (void *)(cmod_base + l->fileofs);
@@ -470,14 +468,14 @@ void CMod_LoadAreas (lump_t *l)
 
 /*
 =================
-CMod_LoadAreaPortals
+CMod_LoadAreaPortals_Q2
 =================
 */
-void CMod_LoadAreaPortals (lump_t *l)
+void CMod_LoadAreaPortals_Q2 (lump_t *l)
 {
 	int			i;
-	dareaportal_t		*out;
-	dareaportal_t 	*in;
+	dareaportal_q2_t		*out;
+	dareaportal_q2_t 	*in;
 	int			count;
 
 	in = (void *)(cmod_base + l->fileofs);
@@ -500,10 +498,10 @@ void CMod_LoadAreaPortals (lump_t *l)
 
 /*
 =================
-CMod_LoadVisibility
+CMod_LoadVisibility_Q2
 =================
 */
-void CMod_LoadVisibility (lump_t *l)
+void CMod_LoadVisibility_Q2 (lump_t *l)
 {
 	int		i;
 
@@ -521,13 +519,12 @@ void CMod_LoadVisibility (lump_t *l)
 	}
 }
 
-
 /*
 =================
-CMod_LoadEntityString
+CMod_LoadEntityString_Q2
 =================
 */
-void CMod_LoadEntityString (lump_t *l, char *name)
+void CMod_LoadEntityString_Q2 (lump_t *l, char *name)
 {
 	// Knightmare- .ent file support
 	if (sv_entfile->value)
@@ -544,12 +541,12 @@ void CMod_LoadEntityString (lump_t *l, char *name)
 		{
 			if (bufLen + 1 > sizeof(map_entitystring)) // jit fix
 			{
-				Com_Printf ("CMod_LoadEntityString: .ent file %s too large: %i > %i.\n", s, bufLen, sizeof(map_entitystring));
+				Com_Printf ("CMod_LoadEntityString_Q2: .ent file %s too large: %i > %i.\n", s, bufLen, sizeof(map_entitystring));
 				FS_FreeFile (buffer);
 			}
 			else
 			{
-				Com_Printf ("CMod_LoadEntityString: .ent file %s loaded.\n", s);
+				Com_Printf ("CMod_LoadEntityString_Q2: .ent file %s loaded.\n", s);
 				numentitychars = bufLen;
 				memcpy (map_entitystring, buffer, bufLen);
 				map_entitystring[bufLen] = 0; // jit entity bug - null terminate the entity string! 
@@ -559,7 +556,7 @@ void CMod_LoadEntityString (lump_t *l, char *name)
 		}
 		else if (bufLen != -1)	// catch too-small entfile
 		{
-			Com_Printf ("CMod_LoadEntityString: .ent file %s too small.\n", s);
+			Com_Printf ("CMod_LoadEntityString_Q2: .ent file %s too small.\n", s);
 			FS_FreeFile (buffer);
 		}
 		// fall back to bsp entity string if no .ent file loaded
@@ -588,7 +585,7 @@ cmodel_t *CM_LoadMap (char *name, qboolean clientload, unsigned *checksum)
 {
 	unsigned		*buf;
 	int				i;
-	dheader_t		header;
+	dheader_q2_t	header;
 	int				length;
 	static unsigned	last_checksum;
 
@@ -634,8 +631,8 @@ cmodel_t *CM_LoadMap (char *name, qboolean clientload, unsigned *checksum)
 	last_checksum = LittleLong (Com_BlockChecksum (buf, length));
 	*checksum = last_checksum;
 
-	header = *(dheader_t *)buf;
-	for (i=0 ; i<sizeof(dheader_t)/4 ; i++)
+	header = *(dheader_q2_t *)buf;
+	for (i=0 ; i<sizeof(dheader_q2_t)/4 ; i++)
 		((int *)&header)[i] = LittleLong ( ((int *)&header)[i]);
 
 	if (header.version != BSPVERSION)
@@ -645,18 +642,18 @@ cmodel_t *CM_LoadMap (char *name, qboolean clientload, unsigned *checksum)
 	cmod_base = (byte *)buf;
 
 	// load into heap
-	CMod_LoadSurfaces (&header.lumps[LUMP_TEXINFO]);
-	CMod_LoadLeafs (&header.lumps[LUMP_LEAFS]);
-	CMod_LoadLeafBrushes (&header.lumps[LUMP_LEAFBRUSHES]);
-	CMod_LoadPlanes (&header.lumps[LUMP_PLANES]);
-	CMod_LoadBrushes (&header.lumps[LUMP_BRUSHES]);
-	CMod_LoadBrushSides (&header.lumps[LUMP_BRUSHSIDES]);
-	CMod_LoadSubmodels (&header.lumps[LUMP_MODELS]);
-	CMod_LoadNodes (&header.lumps[LUMP_NODES]);
-	CMod_LoadAreas (&header.lumps[LUMP_AREAS]);
-	CMod_LoadAreaPortals (&header.lumps[LUMP_AREAPORTALS]);
-	CMod_LoadVisibility (&header.lumps[LUMP_VISIBILITY]);
-	CMod_LoadEntityString (&header.lumps[LUMP_ENTITIES], name);
+	CMod_LoadSurfaces_Q2 (&header.lumps[LUMP_TEXINFO_Q2]);
+	CMod_LoadLeafs_Q2 (&header.lumps[LUMP_LEAFS_Q2]);
+	CMod_LoadLeafBrushes_Q2 (&header.lumps[LUMP_LEAFBRUSHES_Q2]);
+	CMod_LoadPlanes_Q2 (&header.lumps[LUMP_PLANES_Q2]);
+	CMod_LoadBrushes_Q2 (&header.lumps[LUMP_BRUSHES_Q2]);
+	CMod_LoadBrushSides_Q2 (&header.lumps[LUMP_BRUSHSIDES_Q2]);
+	CMod_LoadSubmodels_Q2 (&header.lumps[LUMP_MODELS_Q2]);
+	CMod_LoadNodes_Q2 (&header.lumps[LUMP_NODES_Q2]);
+	CMod_LoadAreas_Q2 (&header.lumps[LUMP_AREAS_Q2]);
+	CMod_LoadAreaPortals_Q2 (&header.lumps[LUMP_AREAPORTALS_Q2]);
+	CMod_LoadVisibility_Q2 (&header.lumps[LUMP_VISIBILITY_Q2]);
+	CMod_LoadEntityString_Q2 (&header.lumps[LUMP_ENTITIES_Q2], name);
 
 	// Knightmare- replaced this with better implementation
 /*	// Barnes- try to load entity replacement file
@@ -760,8 +757,8 @@ int		CM_LeafArea (int leafnum)
 
 cplane_t	*box_planes;
 int			box_headnode;
-cbrush_t	*box_brush;
-cleaf_t		*box_leaf;
+cbrush_q2_t	*box_brush_q2;
+cleaf_q2_t		*box_leaf_q2;
 
 /*
 ===================
@@ -777,7 +774,7 @@ void CM_InitBoxHull (void)
 	int			side;
 	cnode_t		*c;
 	cplane_t	*p;
-	cbrushside_t	*s;
+	cbrushside_q2_t	*s;
 
 	box_headnode = numnodes;
 	box_planes = &map_planes[numplanes];
@@ -788,15 +785,15 @@ void CM_InitBoxHull (void)
 		|| numplanes+12 > MAX_MAP_PLANES)
 		Com_Error (ERR_DROP, "Not enough room for box tree");
 
-	box_brush = &map_brushes[numbrushes];
-	box_brush->numsides = 6;
-	box_brush->firstbrushside = numbrushsides;
-	box_brush->contents = CONTENTS_MONSTER;
+	box_brush_q2 = &map_brushes[numbrushes];
+	box_brush_q2->numsides = 6;
+	box_brush_q2->firstbrushside = numbrushsides;
+	box_brush_q2->contents = CONTENTS_MONSTER;
 
-	box_leaf = &map_leafs[numleafs];
-	box_leaf->contents = CONTENTS_MONSTER;
-	box_leaf->firstleafbrush = numleafbrushes;
-	box_leaf->numleafbrushes = 1;
+	box_leaf_q2 = &map_leafs[numleafs];
+	box_leaf_q2->contents = CONTENTS_MONSTER;
+	box_leaf_q2->firstleafbrush = numleafbrushes;
+	box_leaf_q2->numleafbrushes = 1;
 
 	map_leafbrushes[numleafbrushes] = numbrushes;
 
@@ -1057,7 +1054,7 @@ CM_ClipBoxToBrush
 ================
 */
 void CM_ClipBoxToBrush (vec3_t mins, vec3_t maxs, vec3_t p1, vec3_t p2,
-					  trace_t *trace, cbrush_t *brush)
+					  trace_t *trace, cbrush_q2_t *brush)
 {
 	int			i, j;
 	cplane_t	*plane, *clipplane;
@@ -1067,7 +1064,7 @@ void CM_ClipBoxToBrush (vec3_t mins, vec3_t maxs, vec3_t p1, vec3_t p2,
 	float		d1, d2;
 	qboolean	getout, startout;
 	float		f;
-	cbrushside_t	*side, *leadside;
+	cbrushside_q2_t	*side, *leadside;
 
 	enterfrac = -1;
 	leavefrac = 1;
@@ -1171,14 +1168,14 @@ CM_TestBoxInBrush
 ================
 */
 void CM_TestBoxInBrush (vec3_t mins, vec3_t maxs, vec3_t p1,
-					  trace_t *trace, cbrush_t *brush)
+					  trace_t *trace, cbrush_q2_t *brush)
 {
 	int			i, j;
 	cplane_t	*plane;
 	float		dist;
 	vec3_t		ofs;
 	float		d1;
-	cbrushside_t	*side;
+	cbrushside_q2_t	*side;
 
 	if (!brush->numsides)
 		return;
@@ -1229,8 +1226,8 @@ void CM_TraceToLeaf (int leafnum)
 {
 	int			k;
 	int			brushnum;
-	cleaf_t		*leaf;
-	cbrush_t	*b;
+	cleaf_q2_t		*leaf;
+	cbrush_q2_t	*b;
 
 	leaf = &map_leafs[leafnum];
 	if ( !(leaf->contents & trace_contents))
@@ -1263,8 +1260,8 @@ void CM_TestInLeaf (int leafnum)
 {
 	int			k;
 	int			brushnum;
-	cleaf_t		*leaf;
-	cbrush_t	*b;
+	cleaf_q2_t		*leaf;
+	cbrush_q2_t	*b;
 
 	leaf = &map_leafs[leafnum];
 	if ( !(leaf->contents & trace_contents))
@@ -1671,10 +1668,10 @@ AREAPORTALS
 ===============================================================================
 */
 
-void FloodArea_r (carea_t *area, int floodnum)
+void FloodArea_r (carea_q2_t *area, int floodnum)
 {
 	int		i;
-	dareaportal_t	*p;
+	dareaportal_q2_t	*p;
 
 	if (area->floodvalid == floodvalid)
 	{
@@ -1703,7 +1700,7 @@ FloodAreaConnections
 void	FloodAreaConnections (void)
 {
 	int		i;
-	carea_t	*area;
+	carea_q2_t	*area;
 	int		floodnum;
 
 	// all current floods are now invalid

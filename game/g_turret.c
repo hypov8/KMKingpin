@@ -1327,7 +1327,7 @@ void use_turret_breach (edict_t *self, edict_t *other, edict_t *activator)
 		self->think(self);
 	}
 }
-void turret_breach_touch(edict_t *self, edict_t *other, cplane_t *plane, csurface_t *surf)
+void turret_breach_touch(edict_t *self, edict_t *other, cplane_t *plane, csurface_q2_t *surf)
 {
 	// This added for Lazarus to help prevent player from becoming stuck when 
 	// jumping onto a TRACK turret.

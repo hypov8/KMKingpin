@@ -32,15 +32,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifdef ERASER_COMPAT_BUILD
 #ifdef NET_SERVER_BUILD
-#define CONSOLE_WINDOW_NAME			"KMQuake2 Console (Eraser net server)"
+#define CONSOLE_WINDOW_NAME			KM_GAME_NAME" Console (Eraser net server)"
 #else // NET_SERVER_BUILD
-#define CONSOLE_WINDOW_NAME			"KMQuake2 Console (Eraser Compatible)"
+#define CONSOLE_WINDOW_NAME			KM_GAME_NAME" Console (Eraser Compatible)"
 #endif // NET_SERVER_BUILD
 #else // ERASER_COMPAT_BUILD
 #ifdef NET_SERVER_BUILD
-#define CONSOLE_WINDOW_NAME			"KMQuake2 Console (net server)"
+#define CONSOLE_WINDOW_NAME			KM_GAME_NAME" Console (net server)"
 #else
-#define CONSOLE_WINDOW_NAME			"KMQuake2 Console"
+#define CONSOLE_WINDOW_NAME			KM_GAME_NAME" Console"
 #endif // NET_SERVER_BUILD
 #endif // ERASER_COMPAT_BUILD
 

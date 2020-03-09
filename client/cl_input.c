@@ -685,10 +685,17 @@ void CL_SendCmd_Async (void)
 	MSG_WriteDeltaUsercmd (&buf, oldcmd, cmd);
 
 	// calculate a checksum over the move commands
-	buf.data[checksumIndex] = COM_BlockSequenceCRCByte(
+#if !KINGPIN
+		buf.data[checksumIndex] = COM_BlockSequenceCRCByte(
 		buf.data + checksumIndex + 1, buf.cursize - checksumIndex - 1,
 		cls.netchan.outgoing_sequence);
-
+#else
+	buf.data[checksumIndex] = COM_BlockSequenceCheckByte(
+		buf.data + checksumIndex + 1,
+		buf.cursize - checksumIndex - 1,
+		cls.netchan.outgoing_sequence,
+		cls.challenge); //hypov8 todo: ok??
+#endif
 	//
 	// deliver the message
 	//
@@ -789,9 +796,15 @@ void CL_SendCmd (void)
 	MSG_WriteDeltaUsercmd (&buf, oldcmd, cmd);
 
 	// calculate a checksum over the move commands
+#if !KINGPIN
 	buf.data[checksumIndex] = COM_BlockSequenceCRCByte(
-		buf.data + checksumIndex + 1, buf.cursize - checksumIndex - 1,
-		cls.netchan.outgoing_sequence);
+#else
+	buf.data[checksumIndex] = COM_BlockSequenceCheckByte(
+#endif
+		buf.data + checksumIndex + 1,
+		buf.cursize - checksumIndex - 1,
+		cls.netchan.outgoing_sequence,
+		cls.challenge); //hypov8 todo: ok??);
 
 	//
 	// deliver the message
