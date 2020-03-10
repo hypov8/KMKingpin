@@ -1,3 +1,29 @@
+KMKingpin
+A kingpin compatible client based on KMQuake2
+Initially created to hep find bugs on client side
+
+features not implemented yet
+------------------------------
+no support for .dll loading
+most sprites not working
+surface flags
+TCP server browser
+
+
+features implemented
+------------------------------
+online play partly supported. (kpded2 network code)
+support loading of kingpin assets. mdx, tga etc.
+Supporting .png map textures of higher rez
+kingpin UI
+
+
+---- end hypov8 ----
+
+
+
+
+
 ------------------------------
 KMQuake2 v0.20 with update 7
 
