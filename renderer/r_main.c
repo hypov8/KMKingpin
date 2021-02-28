@@ -227,7 +227,7 @@ R_PolyBlend
 */
 void R_PolyBlend (void)
 {
-	if (!r_polyblend->value)
+	if (!r_polyblend->value) //hypov8 todo: gl_polyblend 2
 		return;
 	if (!v_blend[3])
 		return;
@@ -969,8 +969,13 @@ void R_Register (void)
 	r_picmip = Cvar_Get ("r_picmip", "0", 0);
 #endif
 	r_skymip = Cvar_Get ("r_skymip", "0", 0);
+#ifndef HYPODEBUG
+	r_showtris = Cvar_Get ("r_showtris", "0", 0);
+	r_showbbox = Cvar_Get ("r_showbbox", "0", 0); // show model bounding box
+#else
 	r_showtris = Cvar_Get ("r_showtris", "0", CVAR_CHEAT);
 	r_showbbox = Cvar_Get ("r_showbbox", "0", CVAR_CHEAT); // show model bounding box
+#endif
 	r_ztrick = Cvar_Get ("r_ztrick", "0", 0);
 	r_finish = Cvar_Get ("r_finish", "0", CVAR_ARCHIVE);
 	r_cull = Cvar_Get ("r_cull", "1", 0);

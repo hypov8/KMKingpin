@@ -73,6 +73,7 @@ float	pm_waterfriction = 1;
 
 
 // Knightmare- this function sets the max speed varibles
+#ifndef KINGPIN
 void SetSpeedMax (void)
 {
 	if (!clientstate) // defaults, used if not connected
@@ -112,7 +113,7 @@ void SetSpeedMax (void)
 	else
 		pm_stopspeed = DEFAULT_STOPSPEED;
 }
-
+#endif
 
 /*
 
@@ -1636,8 +1637,9 @@ void Pmove (pmove_t *pmove)
 	pm = pmove;
 
 	// Knightmare- set speed controls here
+#ifndef KINGPIN
 	SetSpeedMax();
-
+#endif
 	// clear results
 	pm->numtouch = 0;
 	VectorClear (pm->viewangles);

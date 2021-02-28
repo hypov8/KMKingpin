@@ -539,6 +539,7 @@ void CL_DeltaEntity (frame_t *frame, int newnum, entity_state_t *old, int bits)
 
 	// some data changes will force no lerping
 	if (state->modelindex != ent->current.modelindex
+#ifndef KINGPIN
 		|| state->modelindex2 != ent->current.modelindex2
 		|| state->modelindex3 != ent->current.modelindex3
 		|| state->modelindex4 != ent->current.modelindex4
@@ -546,6 +547,7 @@ void CL_DeltaEntity (frame_t *frame, int newnum, entity_state_t *old, int bits)
 		// 1/18/2002- extra model indices
 		|| state->modelindex5 != ent->current.modelindex5
 		|| state->modelindex6 != ent->current.modelindex6
+#endif
 #endif
 		|| abs(state->origin[0] - ent->current.origin[0]) > 512
 		|| abs(state->origin[1] - ent->current.origin[1]) > 512
@@ -847,7 +849,7 @@ void CL_ParsePlayerstate (frame_t *oldframe, frame_t *newframe)
 		if (flags & PS_WEAPONFRAME)
 		{
 			state->gunframe = MSG_ReadByte (&net_message);
-#if !KINGPIN
+#if KINGPIN
 			state->gunoffset[0] = MSG_ReadChar (&net_message)*0.25;
 			state->gunoffset[1] = MSG_ReadChar (&net_message)*0.25;
 			state->gunoffset[2] = MSG_ReadChar (&net_message)*0.25;
@@ -857,7 +859,7 @@ void CL_ParsePlayerstate (frame_t *oldframe, frame_t *newframe)
 #endif
 		}
 
-#if KINGPIN //hypov8 todo: what uses this??
+#if 0 //KINGPIN //hypov8 todo: what uses this??
 		//if (flags & PS_GUNOFFSET)
 		if (flags & PS_WEAPONFRAME) //hypov8 ??
 		{
@@ -1758,7 +1760,9 @@ void CL_AddPacketEntities (frame_t *frame)
 					char skinIndex[32];
 					int baseSkin = s1->model_parts[x].baseskin;
 					int painSkin = s1->model_parts[x].skinnum[0]; //hypov8 todo: mdx objects
+#ifndef KINGPIN
 					int curSkin = s1->model_parts[x].currentSkin[0]; //hypov8 todo: mdx objects
+#endif
 					//int skinId = s1->model_parts[x].oldSkinIndex;
 
 					//check for new skin. store it
@@ -1771,17 +1775,17 @@ void CL_AddPacketEntities (frame_t *frame)
 						baseSkin -= 1; //shift index back to 0
 
 					//use pain skin?
-					if (curSkin != painSkin)
+					//////////if (curSkin != painSkin)
 					{
 						if (s1->model_parts[x].skinnum[0] % 3 == 1)		//001p1.tga
 							painSkinType = "p1";
 						else if (s1->model_parts[x].skinnum[0] % 3 == 2)//001p2.tga
 							painSkinType = "p2";
 					}
-					else	//use old skin //if(s1->model_parts[x].oldSkin)	
-						ent.skin = s1->model_parts[x].oldSkin;			
+					//else	//use old skin //if(s1->model_parts[x].oldSkin)	
+					////////////	ent.skin = s1->model_parts[x].oldSkin;			
 
-					s1->model_parts[x].currentSkin[0] = painSkin;
+					///////////s1->model_parts[x].currentSkin[0] = painSkin;
 
 					//inital loading of model..							
 					if (!ent.skin)
@@ -1877,17 +1881,17 @@ void CL_AddPacketEntities (frame_t *frame)
 							}
 						}
 					}
-					if (ent.skin)
-						s1->model_parts[x].oldSkin = ent.skin;
+					///////if (ent.skin)
+					////////	s1->model_parts[x].oldSkin = ent.skin;
 
 				}
 				else  //use internal skin?
 				{
-					ent.skin = s1->model_parts[x].oldSkin;
+					//////////////ent.skin = s1->model_parts[x].oldSkin;
 					if (!ent.skin)
 						ent.skin = R_RegisterSkin(cl.configstrings[CS_MODELSKINS + s1->model_parts[x].modelindex]);
-					if (ent.skin)
-						s1->model_parts[x].oldSkin = ent.skin;
+					/////////if (ent.skin)
+					//////////	s1->model_parts[x].oldSkin = ent.skin;
 				}
 
 				ent.skinnum = 0; // (int)cent->current.model_parts[x].skinnum[0]; //more then 1 skin?

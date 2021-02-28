@@ -362,7 +362,7 @@ void SV_WritePlayerstateToClient (client_frame_t *from, client_frame_t *to, size
 
 	if (pflags & PS_M_ORIGIN) // FIXME- map size
 	{
-#if !KINGPIN //def LARGE_MAP_SIZE
+#ifdef LARGE_MAP_SIZE
 		MSG_WritePMCoordNew (msg, ps->pmove.origin[0]);
 		MSG_WritePMCoordNew (msg, ps->pmove.origin[1]);
 		MSG_WritePMCoordNew (msg, ps->pmove.origin[2]);
@@ -424,10 +424,9 @@ void SV_WritePlayerstateToClient (client_frame_t *from, client_frame_t *to, size
 		MSG_WriteChar (msg, ps->kick_angles[2]*4);
 	}
 
-
+#if !KINGPIN 
 	if (pflags & PS_WEAPONINDEX)	//Knightmare- 12/23/2001- send as short
 		MSG_WriteShort (msg, ps->gunindex);
-#if !KINGPIN 
 #ifdef NEW_PLAYER_STATE_MEMBERS	//Knightmare added
 	if (pflags & PS_WEAPONINDEX2)
 		MSG_WriteShort (msg, ps->gunindex2); //Knightmare- gunindex2 support
@@ -436,7 +435,7 @@ void SV_WritePlayerstateToClient (client_frame_t *from, client_frame_t *to, size
 #else
 	if (pflags & PS_WEAPONINDEX)
 	{
-		MSG_WriteByte(msg, ps->gunframe);
+    MSG_WriteByte(msg, ps->gunindex);
 		{
 			int i, c = 0;
 			for (i = 0; i < MAX_MODEL_PARTS; i++)
@@ -475,7 +474,6 @@ void SV_WritePlayerstateToClient (client_frame_t *from, client_frame_t *to, size
 				}
 			}
 		}
-
 	}
 #endif
 
@@ -742,7 +740,12 @@ void SV_BuildClientFrame (client_t *client)
 
 		// ignore ents without visible models unless they have an effect
 		if (!ent->s.modelindex && !ent->s.effects && !ent->s.sound
-			&& !ent->s.event)
+			&& !ent->s.event
+#ifdef KINGPIN
+		&& !ent->s.num_parts
+#endif
+      )
+
 			continue;
 
 		// ignore if not touching a PV leaf

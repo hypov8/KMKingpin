@@ -1113,8 +1113,11 @@ void *Sys_GetGameAPI (void *parms)
 	char	cwd[MAX_OSPATH];
 #if defined _M_IX86
 	//Knightmare- changed DLL name for better cohabitation
+#ifdef KINGPIN
+	const char *gamename = "gamex86.dll"; 
+#else
 	const char *gamename = "kmq2gamex86.dll"; 
-
+#endif
 #ifdef NDEBUG
 	const char *debugdir = "release";
 #else

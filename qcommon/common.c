@@ -849,15 +849,12 @@ void MSG_WriteDeltaEntity (entity_state_t *from, entity_state_t *to, sizebuf_t *
 		MSG_WriteByte (msg, to->modelindex);
 #else
 		MSG_WriteShort (msg, to->modelindex);
-#endif
-#if !KINGPIN //hypov8
 	if (bits & U_MODEL2)
 		MSG_WriteShort (msg, to->modelindex2);
 	if (bits & U_MODEL3)
 		MSG_WriteShort (msg, to->modelindex3);
 	if (bits & U_MODEL4)
 		MSG_WriteShort (msg, to->modelindex4);
-
 
 #ifdef NEW_ENTITY_STATE_MEMBERS
 	// 1/18/2002- extra model indices
@@ -982,7 +979,6 @@ void MSG_WriteDeltaEntity (entity_state_t *from, entity_state_t *to, sizebuf_t *
 	}
 
 
-#if !KINGPIN //hypov8
 #ifdef NEW_ENTITY_STATE_MEMBERS
 	//Knightmare 5/11/2002- added alpha
 	if (bits & U_ALPHA)
@@ -991,24 +987,22 @@ void MSG_WriteDeltaEntity (entity_state_t *from, entity_state_t *to, sizebuf_t *
 		MSG_WriteByte (msg, (byte)(to->alpha*255));
 	}
 #endif
-#endif
+
 	//Knightmare- 12/23/2001
 	//changed this to short
 	if (bits & U_SOUND)
 #if !KINGPIN
-		MSG_WriteShort (msg, to->sound); //hypov8 todo: byte?
+		MSG_WriteShort (msg, to->sound);
 #else
-		MSG_WriteByte (msg, to->sound); //hypov8 todo: byte?
+		MSG_WriteByte (msg, to->sound);
 	else if (bits & U_SOUND16)
 		MSG_WriteShort (msg, to->sound);
 #endif
 
-#if !KINGPIN //hypov8
 #ifdef NEW_ENTITY_STATE_MEMBERS
 #ifdef LOOP_SOUND_ATTENUATION
 	if (bits & U_ATTENUAT)
 		MSG_WriteByte (msg, (int)(min(max(to->attenuation, 0.0f), 4.0f)*64.0));
-#endif
 #endif
 #endif
 

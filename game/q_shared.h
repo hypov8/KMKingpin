@@ -122,19 +122,22 @@ __inline int Q_vsnprintf (char *Dest, size_t Count, const char *Format, va_list 
 // enable to build exe to host net games
 // (to bring MAX_MSG_LENGTH in line with UDP packet size)
 //#define NET_SERVER_BUILD
-
+#ifndef KINGPIN
 #ifdef KMQUAKE2_ENGINE_MOD
 #ifndef ERASER_COMPAT_BUILD
 #define NEW_ENTITY_STATE_MEMBERS
 #endif
+
 #define NEW_PLAYER_STATE_MEMBERS
 // enable to build exe with 24-bit coordinate transmission
 // changes pmove origin size in game DLLs
 #define LARGE_MAP_SIZE
+
 // enable to include looping of attenuated sounds
 // changes entity_state_t struct
 #define LOOP_SOUND_ATTENUATION
 #endif
+#endif //kingpin
 
 #define ROQ_SUPPORT // whether to use new cinematic system
 
@@ -1841,9 +1844,11 @@ typedef struct model_part_s
 	byte	hitpoints[MAX_MODELPART_OBJECTS];
 	byte	hit_scale[MAX_MODELPART_OBJECTS]; // 0-250
 
+#ifndef KINGPIN //hypov8 changed structure!!!
 	int		currentSkin[MAX_MODELPART_OBJECTS];
 	int		oldSkinIndex; //hypov8 add: store skin id so we dont keep searching for it
 	struct image_s	*oldSkin;
+#endif
 } model_part_t;
 
 #define	MAX_MODEL_DIR_LIGHTS	3		// bound to 8 by network code
@@ -1879,7 +1884,7 @@ typedef struct flamejunc_s
 
 	struct flamejunc_s	*next;
 } flamejunc_t;
-#endif
+#endif //KINGPIN
 
 // entity_state_t is the information conveyed from the server
 // in an update message about entities that the client will
@@ -1892,7 +1897,9 @@ typedef struct entity_state_s
 	vec3_t	angles;
 	vec3_t	old_origin;		// for lerping
 	int		modelindex;
+#ifndef KINGPIN
 	int		modelindex2, modelindex3, modelindex4;	// weapons, CTF flags, etc
+#endif
 #ifdef NEW_ENTITY_STATE_MEMBERS // Knightmare- Privater wanted this
 	int		modelindex5, modelindex6; 	// more attached models
 #endif
@@ -1937,7 +1944,7 @@ typedef struct entity_state_s
 	int	last_time, prev_last_time;		// time of last call to CL_FlameEffects() for this entity
 	byte		broken_flag;			// set if we release the trigger, so next time we fire, we can free all current flames
 
-//hypov8	float	alpha;			// set in CL_AddPacketEntities() from entity_state->effects
+	float	alpha;			// set in CL_AddPacketEntities() from entity_state->effects //hypov8
 
 	float	scale;			// ranges from 0.0 -> 2.0
 #endif

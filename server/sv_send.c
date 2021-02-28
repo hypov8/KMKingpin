@@ -651,9 +651,13 @@ void SV_StartSound (vec3_t origin, edict_t *entity, int channel,
 	MSG_WriteByte (&sv.multicast, svc_sound);
 	MSG_WriteByte (&sv.multicast, flags);
 
+
+#if !KINGPIN
 	//Knightmare- 12/23/2001- changed to short
 	MSG_WriteShort (&sv.multicast, soundindex);
-		
+#else
+	MSG_WriteByte (&sv.multicast, soundindex);
+#endif	
 	if (flags & SND_VOLUME)
 		MSG_WriteByte (&sv.multicast, volume*255);
 	if (flags & SND_ATTENUATION)
